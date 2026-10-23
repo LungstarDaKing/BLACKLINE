@@ -1,0 +1,73 @@
+[gd_scene format=3 uid="uid://c2hywyb53vi1i"]
+
+[ext_resource type="Script" uid="uid://djr1dqd728ce3" path="res://scripts/vehicles/arcade_car.gd" id="1_script"]
+[ext_resource type="Material" path="res://assets/materials/car_black.tres" id="2_body"]
+[ext_resource type="Material" path="res://assets/materials/metal_dark.tres" id="3_dark"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(1.85, 1.1, 4.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_body"]
+size = Vector3(1.8, 0.65, 4.3)
+
+[sub_resource type="BoxMesh" id="BoxMesh_cabin"]
+size = Vector3(1.5, 0.48, 2.1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wheel"]
+top_radius = 0.32
+bottom_radius = 0.32
+height = 0.28
+
+[node name="GetawaySedan" type="CharacterBody3D" unique_id=1493720252]
+collision_layer = 8
+collision_mask = 15
+script = ExtResource("1_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1818729956]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+shape = SubResource("BoxShape3D_body")
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=260925019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.72, 0)
+mesh = SubResource("BoxMesh_body")
+surface_material_override/0 = ExtResource("2_body")
+
+[node name="Cabin" type="MeshInstance3D" parent="." unique_id=1107085290]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.18, -0.2)
+mesh = SubResource("BoxMesh_cabin")
+surface_material_override/0 = ExtResource("3_dark")
+
+[node name="WheelFL" type="MeshInstance3D" parent="." unique_id=1809214911]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 0.88, 0.32, 1.35)
+mesh = SubResource("CylinderMesh_wheel")
+surface_material_override/0 = ExtResource("3_dark")
+
+[node name="WheelFR" type="MeshInstance3D" parent="." unique_id=315149559]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, -0.88, 0.32, 1.35)
+mesh = SubResource("CylinderMesh_wheel")
+surface_material_override/0 = ExtResource("3_dark")
+
+[node name="WheelRL" type="MeshInstance3D" parent="." unique_id=1478994202]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 0.88, 0.32, -1.35)
+mesh = SubResource("CylinderMesh_wheel")
+surface_material_override/0 = ExtResource("3_dark")
+
+[node name="WheelRR" type="MeshInstance3D" parent="." unique_id=690258401]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, -0.88, 0.32, -1.35)
+mesh = SubResource("CylinderMesh_wheel")
+surface_material_override/0 = ExtResource("3_dark")
+
+[node name="ChaseCamera" type="Camera3D" parent="." unique_id=307051965]
+transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 2.7, 8)
+fov = 72.0
+
+[node name="ExitMarker" type="Marker3D" parent="." unique_id=1846489725]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.2, 0.2, 0)
+
+[node name="InteractZone" type="Area3D" parent="." unique_id=102780427]
+collision_layer = 16
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InteractZone" unique_id=1204182915]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+shape = SubResource("BoxShape3D_body")

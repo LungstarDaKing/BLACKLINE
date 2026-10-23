@@ -1,0 +1,15 @@
+cat << 'EOF' > .gitignore
+# Godot-specific ignores
+.godot/
+.import/
+export_presets.cfg
+
+# Mono-specific ignores (if using C#)
+.mono/
+data_*/
+mono_crash_*.json
+
+# System/Tool ignores
+*.tmp
+.DS_Store
+EOF

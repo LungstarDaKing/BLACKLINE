@@ -1,0 +1,54 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/ai/enemy_guard.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/combat/weapon.gd" id="2_weapon"]
+[ext_resource type="Material" path="res://assets/materials/enemy_body.tres" id="3_mat"]
+[ext_resource type="Material" path="res://assets/materials/metal_dark.tres" id="4_dark"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_e"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_e"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_armor"]
+size = Vector3(0.9, 0.5, 0.42)
+
+[sub_resource type="BoxMesh" id="BoxMesh_flash"]
+size = Vector3(0.05, 0.05, 0.1)
+
+[node name="Enemy" type="CharacterBody3D"]
+collision_layer = 4
+collision_mask = 11
+script = ExtResource("1_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_e")
+
+[node name="MeshRoot" type="Node3D" parent="."]
+
+[node name="Body" type="MeshInstance3D" parent="MeshRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+mesh = SubResource("CapsuleMesh_e")
+surface_material_override/0 = ExtResource("3_mat")
+
+[node name="Armor" type="MeshInstance3D" parent="MeshRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0)
+mesh = SubResource("BoxMesh_armor")
+surface_material_override/0 = ExtResource("4_dark")
+
+[node name="Weapon" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, 1.25, -0.35)
+script = ExtResource("2_weapon")
+is_player_weapon = false
+damage = 7.0
+fire_cooldown = 1.2
+mag_size = 12
+reserve_ammo = 99
+
+[node name="MuzzleFlash" type="MeshInstance3D" parent="Weapon"]
+visible = false
+mesh = SubResource("BoxMesh_flash")

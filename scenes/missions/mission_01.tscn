@@ -1,0 +1,28 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/getaway_sedan.tscn" id="2_getaway"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/police_sedan.tscn" id="3_police"]
+[ext_resource type="PackedScene" path="res://scenes/characters/enemy.tscn" id="4_enemy"]
+[ext_resource type="PackedScene" path="res://scenes/environment/district.tscn" id="5_district"]
+[ext_resource type="PackedScene" path="res://scenes/ui/game_ui.tscn" id="6_ui"]
+[ext_resource type="Script" path="res://scripts/missions/mission_01.gd" id="7_script"]
+
+[node name="Mission01" type="Node3D"]
+script = ExtResource("7_script")
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+
+[node name="GetawaySedan" parent="." instance=ExtResource("2_getaway")]
+
+[node name="PoliceSedan" parent="." instance=ExtResource("3_police")]
+
+[node name="GameUI" parent="." instance=ExtResource("6_ui")]
+
+[node name="District" parent="." instance=ExtResource("5_district")]
+
+[node name="Enemy1" parent="." instance=ExtResource("4_enemy")]
+
+[node name="Enemy2" parent="." instance=ExtResource("4_enemy")]
+
+[node name="Enemy3" parent="." instance=ExtResource("4_enemy")]

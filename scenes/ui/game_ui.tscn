@@ -1,0 +1,396 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/game_ui.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.05, 0.05, 0.06, 0.95)
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_width_left = 1
+border_color = Color(0.25, 0.22, 0.18, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_health_bg"]
+bg_color = Color(0.1, 0.02, 0.02, 1)
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_width_left = 1
+border_color = Color(0.3, 0.1, 0.1, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_normal"]
+bg_color = Color(0.15, 0.15, 0.18, 1)
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_width_left = 1
+border_color = Color(0.35, 0.3, 0.25, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
+bg_color = Color(0.2, 0.18, 0.2, 1)
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_width_left = 1
+border_color = Color(0.85, 0.7, 0.25, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_pressed"]
+bg_color = Color(0.12, 0.12, 0.14, 1)
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_width_left = 1
+border_color = Color(0.7, 0.6, 0.2, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="ButtonTheme" id="ButtonTheme_ui"]
+normal = SubResource("StyleBoxFlat_button_normal")
+hover = SubResource("StyleBoxFlat_button_hover")
+pressed = SubResource("StyleBoxFlat_button_pressed")
+font_color = Color(0.9, 0.88, 0.85, 1)
+font_outline_size = 1
+font_outline_color = Color(0, 0, 0, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_result"]
+bg_color = Color(0.08, 0.08, 0.1, 0.98)
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_width_left = 2
+border_color = Color(0.85, 0.7, 0.25, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="GameUI" type="CanvasLayer"]
+script = ExtResource("1_script")
+
+[node name="HUD" type="Control" parent="."]
+anchors_preset = 15
+layout_mode = 1
+
+[node name="HealthBG" type="Panel" parent="HUD"]
+layout_mode = 1
+anchors_preset = 9
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 20
+offset_top = 20
+offset_right = 220
+offset_bottom = 60
+theme_override_styles/panel = SubResource("StyleBoxFlat_health_bg")
+
+[node name="HealthBar" type="ColorRect" parent="HUD/HealthBG"]
+anchors_preset = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = 4
+offset_top = 4
+offset_right = -4
+offset_bottom = -4
+color = Color(0.72, 0.18, 0.16, 1)
+
+[node name="HealthText" type="Label" parent="HUD/HealthBG"]
+anchors_preset = 15
+layout_mode = 1
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "HP 100/100"
+font_size = 16
+theme_override_colors/font_color = Color(0.9, 0.88, 0.85, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 1
+
+[node name="AmmoText" type="Label" parent="HUD"]
+anchors_preset = 9
+layout_mode = 1
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 20
+offset_top = 90
+offset_right = 220
+offset_bottom = 120
+horizontal_alignment = 0
+vertical_alignment = 1
+text = "VALERI MK-2  12 / 36"
+font_size = 16
+theme_override_colors/font_color = Color(0.85, 0.8, 0.7, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 1
+
+[node name="Objective" type="Label" parent="HUD"]
+anchors_preset = 8
+layout_mode = 1
+anchor_left = 0.5
+anchor_top = 0.0
+anchor_right = 0.5
+anchor_bottom = 0.0
+offset_left = -300
+offset_top = 20
+offset_right = 300
+offset_bottom = 60
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 1
+text = "Objective will appear here"
+font_size = 18
+theme_override_colors/font_color = Color(0.9, 0.88, 0.85, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 1
+
+[node name="Prompt" type="Label" parent="HUD"]
+anchors_preset = 8
+layout_mode = 1
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -250
+offset_top = -80
+offset_right = 250
+offset_bottom = -40
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 1
+text = ""
+font_size = 16
+theme_override_colors/font_color = Color(0.7, 0.85, 0.7, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 1
+visible = false
+
+[node name="Feedback" type="Label" parent="HUD"]
+anchors_preset = 8
+layout_mode = 1
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -300
+offset_top = -120
+offset_right = 300
+offset_bottom = -80
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 1
+text = ""
+font_size = 16
+theme_override_colors/font_color = Color(0.85, 0.8, 0.4, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 1
+visible = false
+
+[node name="Wanted" type="Label" parent="HUD"]
+anchors_preset = 10
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -320
+offset_top = 20
+offset_right = -20
+offset_bottom = 60
+horizontal_alignment = 2
+vertical_alignment = 1
+text = "WANTED — SECTOR 4"
+font_size = 18
+theme_override_colors/font_color = Color(0.9, 0.25, 0.22, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+visible = false
+
+[node name="Escape" type="Label" parent="HUD"]
+anchors_preset = 10
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -320
+offset_top = 70
+offset_right = -20
+offset_bottom = 110
+horizontal_alignment = 2
+vertical_alignment = 1
+text = "ESCAPE 0%   13:00"
+font_size = 18
+theme_override_colors/font_color = Color(0.7, 0.85, 0.7, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 1
+visible = false
+
+[node name="Dialogue" type="Panel" parent="."]
+anchors_preset = 2
+layout_mode = 1
+anchor_left = 0.1
+anchor_top = 0.65
+anchor_right = 0.9
+anchor_bottom = 1.0
+offset_left = 0
+offset_top = 0
+offset_right = 0
+offset_bottom = -20
+visible = false
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Speaker" type="Label" parent="Dialogue"]
+anchors_preset = 7
+layout_mode = 1
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = 20
+offset_top = 16
+offset_right = -20
+offset_bottom = 50
+horizontal_alignment = 0
+vertical_alignment = 1
+text = "SPEAKER"
+font_size = 20
+theme_override_colors/font_color = Color(0.85, 0.7, 0.25, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 1
+
+[node name="Body" type="Label" parent="Dialogue"]
+anchors_preset = 15
+layout_mode = 1
+offset_left = 20
+offset_top = 56
+offset_right = -20
+offset_bottom = -16
+horizontal_alignment = 0
+vertical_alignment = 0
+autowrap_mode = 1
+text = "Dialogue text..."
+font_size = 18
+theme_override_colors/font_color = Color(0.9, 0.88, 0.85, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 1
+
+[node name="Pause" type="Panel" parent="."]
+anchors_preset = 15
+layout_mode = 1
+visible = false
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="PauseVBox" type="VBoxContainer" parent="Pause"]
+anchors_preset = 15
+layout_mode = 1
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="PauseTitle" type="Label" parent="Pause/PauseVBox"]
+text = "PAUSED"
+horizontal_alignment = 1
+vertical_alignment = 1
+font_size = 36
+theme_override_colors/font_color = Color(0.9, 0.88, 0.85, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+
+[node name="Resume" type="Button" parent="Pause/PauseVBox"]
+text = "RESUME"
+theme = ExtResource("ButtonTheme_ui")
+custom_minimum_size = Vector2(240, 48)
+
+[node name="Restart" type="Button" parent="Pause/PauseVBox"]
+text = "RESTART MISSION"
+theme = ExtResource("ButtonTheme_ui")
+custom_minimum_size = Vector2(240, 48)
+
+[node name="Menu" type="Button" parent="Pause/PauseVBox"]
+text = "MAIN MENU"
+theme = ExtResource("ButtonTheme_ui")
+custom_minimum_size = Vector2(240, 48)
+
+[node name="Quit" type="Button" parent="Pause/PauseVBox"]
+text = "QUIT GAME"
+theme = ExtResource("ButtonTheme_ui")
+custom_minimum_size = Vector2(240, 48)
+
+[node name="Result" type="Panel" parent="."]
+anchors_preset = 15
+layout_mode = 1
+visible = false
+theme_override_styles/panel = SubResource("StyleBoxFlat_result")
+
+[node name="ResultVBox" type="VBoxContainer" parent="Result"]
+anchors_preset = 15
+layout_mode = 1
+alignment = 1
+theme_override_constants/separation = 20
+
+[node name="Title" type="Label" parent="Result/ResultVBox"]
+text = "MISSION COMPLETE"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 1
+font_size = 36
+theme_override_colors/font_color = Color(0.85, 0.75, 0.35, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+
+[node name="Body" type="Label" parent="Result/ResultVBox"]
+text = "Mission description text..."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 1
+font_size = 18
+theme_override_colors/font_color = Color(0.85, 0.8, 0.75, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 1
+
+[node name="ResultButtons" type="HBoxContainer" parent="Result/ResultVBox"]
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="RestartBtn" type="Button" parent="Result/ResultVBox/ResultButtons"]
+text = "RESTART"
+theme = ExtResource("ButtonTheme_ui")
+custom_minimum_size = Vector2(180, 48)
+
+[node name="MenuBtn" type="Button" parent="Result/ResultVBox/ResultButtons"]
+text = "MAIN MENU"
+theme = ExtResource("ButtonTheme_ui")
+custom_minimum_size = Vector2(180, 48)
+
+[node name="QuitBtn" type="Button" parent="Result/ResultVBox/ResultButtons"]
+text = "QUIT"
+theme = ExtResource("ButtonTheme_ui")
+custom_minimum_size = Vector2(180, 48)
+
+[connection signal="pressed" from="Pause/PauseVBox/Resume" to="." method="_on_resume"]
+[connection signal="pressed" from="Pause/PauseVBox/Restart" to="." method="_on_restart"]
+[connection signal="pressed" from="Pause/PauseVBox/Menu" to="." method="_on_menu"]
+[connection signal="pressed" from="Pause/PauseVBox/Quit" to="." method="_on_quit"]
+[connection signal="pressed" from="Result/ResultVBox/ResultButtons/RestartBtn" to="." method="_on_restart"]
+[connection signal="pressed" from="Result/ResultVBox/ResultButtons/MenuBtn" to="." method="_on_menu"]
+[connection signal="pressed" from="Result/ResultVBox/ResultButtons/QuitBtn" to="." method="_on_quit"]

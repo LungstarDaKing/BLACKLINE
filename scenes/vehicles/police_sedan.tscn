@@ -1,0 +1,94 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/ai/police_pursuit.gd" id="1_script"]
+[ext_resource type="Material" path="res://assets/materials/car_police.tres" id="2_body"]
+[ext_resource type="Material" path="res://assets/materials/metal_dark.tres" id="3_dark"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(1.85, 1.1, 4.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_body"]
+size = Vector3(1.8, 0.65, 4.3)
+
+[sub_resource type="BoxMesh" id="BoxMesh_cabin"]
+size = Vector3(1.5, 0.48, 2.1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wheel"]
+top_radius = 0.32
+bottom_radius = 0.32
+height = 0.28
+
+[sub_resource type="BoxMesh" id="BoxMesh_light"]
+size = Vector3(0.35, 0.12, 0.35)
+
+[sub_resource type="StandardMaterial3D" id="MatRed"]
+albedo_color = Color(0.9, 0.1, 0.1, 1)
+emission_enabled = true
+emission = Color(0.9, 0.05, 0.05, 1)
+emission_energy_multiplier = 2.8
+
+[sub_resource type="StandardMaterial3D" id="MatBlue"]
+albedo_color = Color(0.15, 0.25, 0.95, 1)
+emission_enabled = true
+emission = Color(0.1, 0.2, 1, 1)
+emission_energy_multiplier = 2.8
+
+[node name="PoliceSedan" type="CharacterBody3D"]
+collision_layer = 8
+collision_mask = 15
+script = ExtResource("1_script")
+is_player_car = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+shape = SubResource("BoxShape3D_body")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.72, 0)
+mesh = SubResource("BoxMesh_body")
+surface_material_override/0 = ExtResource("2_body")
+
+[node name="Cabin" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.18, -0.2)
+mesh = SubResource("BoxMesh_cabin")
+surface_material_override/0 = ExtResource("3_dark")
+
+[node name="WheelFL" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 0.88, 0.32, 1.35)
+mesh = SubResource("CylinderMesh_wheel")
+surface_material_override/0 = ExtResource("3_dark")
+
+[node name="WheelFR" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, -0.88, 0.32, 1.35)
+mesh = SubResource("CylinderMesh_wheel")
+surface_material_override/0 = ExtResource("3_dark")
+
+[node name="WheelRL" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 0.88, 0.32, -1.35)
+mesh = SubResource("CylinderMesh_wheel")
+surface_material_override/0 = ExtResource("3_dark")
+
+[node name="WheelRR" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, -0.88, 0.32, -1.35)
+mesh = SubResource("CylinderMesh_wheel")
+surface_material_override/0 = ExtResource("3_dark")
+
+[node name="LightRed" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, 1.5, 0.1)
+visible = false
+mesh = SubResource("BoxMesh_light")
+surface_material_override/0 = SubResource("MatRed")
+
+[node name="LightBlue" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.28, 1.5, 0.1)
+visible = false
+mesh = SubResource("BoxMesh_light")
+surface_material_override/0 = SubResource("MatBlue")
+
+[node name="ChaseCamera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 2.7, 8.0)
+fov = 72.0
+current = false
+
+[node name="ExitMarker" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.2, 0.2, 0)

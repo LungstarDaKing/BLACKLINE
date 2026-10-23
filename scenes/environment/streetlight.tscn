@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/environment/streetlight.gd" id="1_script"]
+
+[node name="Streetlight" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Pole" type="MeshInstance3D" parent="."]
+
+[node name="Lamp" type="MeshInstance3D" parent="."]
