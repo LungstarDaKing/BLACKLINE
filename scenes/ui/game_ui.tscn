@@ -1,6 +1,7 @@
 [gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/game_ui.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="2_script"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.05, 0.05, 0.06, 0.95)
@@ -62,13 +63,11 @@ corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
-[sub_resource type="ButtonTheme" id="ButtonTheme_ui"]
-normal = SubResource("StyleBoxFlat_button_normal")
-hover = SubResource("StyleBoxFlat_button_hover")
-pressed = SubResource("StyleBoxFlat_button_pressed")
-font_color = Color(0.9, 0.88, 0.85, 1)
-font_outline_size = 1
-font_outline_color = Color(0, 0, 0, 1)
+[sub_resource type="Theme" id="ButtonTheme_ui"]
+default_font_fallback = true
+default_font_outline_size = 1
+default_font_outline_color = Color(0, 0, 0, 1)
+default_font_color = Color(0.9, 0.88, 0.85, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_result"]
 bg_color = Color(0.08, 0.08, 0.1, 0.98)
@@ -318,22 +317,22 @@ theme_override_constants/outline_size = 2
 
 [node name="Resume" type="Button" parent="Pause/PauseVBox"]
 text = "RESUME"
-theme = ExtResource("ButtonTheme_ui")
+theme = SubResource("ButtonTheme_ui")
 custom_minimum_size = Vector2(240, 48)
 
 [node name="Restart" type="Button" parent="Pause/PauseVBox"]
 text = "RESTART MISSION"
-theme = ExtResource("ButtonTheme_ui")
+theme = SubResource("ButtonTheme_ui")
 custom_minimum_size = Vector2(240, 48)
 
 [node name="Menu" type="Button" parent="Pause/PauseVBox"]
 text = "MAIN MENU"
-theme = ExtResource("ButtonTheme_ui")
+theme = SubResource("ButtonTheme_ui")
 custom_minimum_size = Vector2(240, 48)
 
 [node name="Quit" type="Button" parent="Pause/PauseVBox"]
 text = "QUIT GAME"
-theme = ExtResource("ButtonTheme_ui")
+theme = SubResource("ButtonTheme_ui")
 custom_minimum_size = Vector2(240, 48)
 
 [node name="Result" type="Panel" parent="."]
@@ -374,17 +373,17 @@ theme_override_constants/separation = 16
 
 [node name="RestartBtn" type="Button" parent="Result/ResultVBox/ResultButtons"]
 text = "RESTART"
-theme = ExtResource("ButtonTheme_ui")
+theme = SubResource("ButtonTheme_ui")
 custom_minimum_size = Vector2(180, 48)
 
 [node name="MenuBtn" type="Button" parent="Result/ResultVBox/ResultButtons"]
 text = "MAIN MENU"
-theme = ExtResource("ButtonTheme_ui")
+theme = SubResource("ButtonTheme_ui")
 custom_minimum_size = Vector2(180, 48)
 
 [node name="QuitBtn" type="Button" parent="Result/ResultVBox/ResultButtons"]
 text = "QUIT"
-theme = ExtResource("ButtonTheme_ui")
+theme = SubResource("ButtonTheme_ui")
 custom_minimum_size = Vector2(180, 48)
 
 [connection signal="pressed" from="Pause/PauseVBox/Resume" to="." method="_on_resume"]

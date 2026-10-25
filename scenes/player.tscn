@@ -1,16 +1,13 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://scripts/player/orbit_camera.gd" id="2_cam"]
 [ext_resource type="Script" path="res://scripts/combat/weapon.gd" id="3_weapon"]
-[ext_resource type="Material" path="res://assets/materials/ghost_body.tres" id="4_mat"]
-[ext_resource type="Material" path="res://assets/materials/metal_dark.tres" id="5_dark"]
+[ext_resource type="PackedScene" path="res://.godot/imported/Kabelo Dlamini.fbx-51d59bdbb7019a2b8708cff7799b748a.scn" id="4_kabelo"]
+[ext_resource type="Material" path="res://assets/materials/ghost_body.tres" id="5_mat"]
+[ext_resource type="Material" path="res://assets/materials/metal_dark.tres" id="6_dark"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
-radius = 0.4
-height = 1.8
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_player"]
 radius = 0.4
 height = 1.8
 
@@ -40,15 +37,8 @@ shape = SubResource("CapsuleShape3D_player")
 
 [node name="MeshRoot" type="Node3D" parent="."]
 
-[node name="Body" type="MeshInstance3D" parent="MeshRoot"]
+[node name="KabeloModel" parent="MeshRoot" instance=ExtResource("4_kabelo")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
-mesh = SubResource("CapsuleMesh_player")
-surface_material_override/0 = ExtResource("4_mat")
-
-[node name="Jacket" type="MeshInstance3D" parent="MeshRoot"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0)
-mesh = SubResource("BoxMesh_jacket")
-surface_material_override/0 = ExtResource("5_dark")
 
 [node name="CameraPivot" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
