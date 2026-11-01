@@ -152,19 +152,19 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -20)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 8)
 
 [node name="Keycard" parent="Objects" unique_id=735000163 instance=ExtResource("6_ga7ek")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, -6.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, -0.7, -6.5)
 display_name = "Vault Keycard"
 color = Color(0.2, 0.9019608, 1, 1)
 
 [node name="Medkit" parent="Objects" unique_id=537792810 instance=ExtResource("6_ga7ek")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 0, -4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, -0.7, -4)
 kind = 1
 amount = 40.0
 display_name = "Medkit"
 color = Color(0.2, 0.9019608, 0.41960785, 1)
 
 [node name="AmmoBox" parent="Objects" unique_id=1841375402 instance=ExtResource("6_ga7ek")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 0, 7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, -0.7, 7)
 kind = 2
 amount = 24.0
 display_name = "Ammo Box"

@@ -2,9 +2,19 @@
 
 [ext_resource type="Script" uid="uid://w7ppmm3hfsfm" path="res://scripts/props/block.gd" id="1_f25kf"]
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_f25kf"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_twce6"]
+albedo_color = Color(0.35, 0.38, 0.45, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_irm28"]
+material = SubResource("StandardMaterial3D_twce6")
+
 [node name="Block" type="StaticBody3D" unique_id=215851015]
 script = ExtResource("1_f25kf")
 
 [node name="Shape" type="CollisionShape3D" parent="." unique_id=946547460]
+shape = SubResource("BoxShape3D_f25kf")
 
 [node name="Mesh" type="MeshInstance3D" parent="." unique_id=2117465678]
+mesh = SubResource("BoxMesh_irm28")

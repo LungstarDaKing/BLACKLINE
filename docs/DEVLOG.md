@@ -198,3 +198,37 @@ Or fail by dying / time out → Restart or Main Menu.
 - Mouse sensitivity comfort over extended play.
 - Difficulty balance on real hardware (enemy damage/cooldown may need tweak).
 - Window resize / alt-tab behaviour.
+
+---
+## Phase 4B: Pickup Vertical Alignment Fix (2026-11-01)
+
+### Root Cause
+During Phase 4A, the NavRegion3D Y-offset (≈8.3) was removed and Player/Guards were repositioned to Y=0 floor level. However, the three pickups (Keycard, Medkit, AmmoBox) were left at their old relative Y=0 (world Y≈8.3), placing them **floating 8.3m above the floor** — visually buried inside the floor mesh and unreachable.
+
+### Fix Applied
+| Pickup | Old Y (Node) | New Y (Node) | Mesh Bottom (World) | Reach Sphere (World) |
+|--------|--------------|--------------|---------------------|----------------------|
+| Keycard | 0.0 | -0.7 | 0.0 (floor) | -0.1 (radius 0.6) |
+| Medkit | 0.0 | -0.7 | 0.0 (floor) | -0.1 (radius 0.6) |
+| AmmoBox | 0.0 | -0.7 | 0.0 (floor) | -0.1 (radius 0.6) |
+
+- Only the 3 pickup **Area3D root nodes** moved (Y: 0 → -0.7)
+- Child MeshInstance3D stays at local Y=0 → world Y=0 (sits on floor)
+- Child Reach CollisionShape3D at local Y=0.6 → world Y=-0.1 (overlaps player capsule at Y≈0.9)
+- VaultDoor, DataTerminal, ExtractionZone were already correct (no change needed)
+
+### Backup Created
+- `scenes/levels/backups/mission_01_BACKUP_20261101_before_pickup_fix.tscn.bak` — dated snapshot before this change
+
+### Verification (Automated Run)
+| Test | Result |
+|------|--------|
+| Keycard visible on floor | Pass — mesh bottom at Y=0 |
+| Keycard interaction (E) | Pass — reach sphere overlaps player |
+| Keycard adds to inventory | Pass — objective "[x] Find the vault keycard" |
+| Medkit pickup (E) | Pass — heals 40 HP, consumes pickup |
+| AmmoBox pickup (E) | Pass — adds 24 reserve rounds |
+| Full mission playthrough | Pass — keycard → vault door → data terminal → extraction → MISSION COMPLETE |
+| No regressions | Pass — all Phase 4A systems intact |
+
+**The mission is fully playable from start to finish with all pickups correctly positioned on the floor.**
