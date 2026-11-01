@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://bayrl7cpxcr76"]
+
+[ext_resource type="Script" uid="uid://c7pkjec12bwyc" path="res://scripts/props/door.gd" id="1_5e0ln"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_yepiq"]
+size = Vector3(3.4, 3, 3.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8dmq6"]
+size = Vector3(3, 3, 0.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lbmyp"]
+albedo_color = Color(0.76862746, 0.41568628, 0.10980392, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_vinnd"]
+size = Vector3(3, 3, 0.4)
+
+[node name="Door" type="Area3D" unique_id=328641433]
+script = ExtResource("1_5e0ln")
+prompt_text = "Open Door"
+
+[node name="Reach" type="CollisionShape3D" parent="." unique_id=247288894]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+shape = SubResource("BoxShape3D_yepiq")
+
+[node name="Slab" type="AnimatableBody3D" parent="." unique_id=994111441]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+
+[node name="Shape" type="CollisionShape3D" parent="Slab" unique_id=1100801906]
+shape = SubResource("BoxShape3D_8dmq6")
+
+[node name="Mesh" type="MeshInstance3D" parent="Slab" unique_id=480612499]
+material_override = SubResource("StandardMaterial3D_lbmyp")
+mesh = SubResource("BoxMesh_vinnd")

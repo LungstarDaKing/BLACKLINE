@@ -1,0 +1,84 @@
+[gd_scene format=3 uid="uid://cveu1b1anwbwi"]
+
+[ext_resource type="Script" uid="uid://bqxef8xyk41y2" path="res://scripts/player/player_controller.gd" id="1_dovo2"]
+[ext_resource type="Script" uid="uid://cc8himtwdhon2" path="res://scripts/player/camera_rig.gd" id="2_gmlin"]
+[ext_resource type="Script" uid="uid://yodxh30270yy" path="res://scripts/components/health_component.gd" id="3_p47bc"]
+[ext_resource type="Script" uid="uid://tug35jnmixnn" path="res://scripts/components/inventory.gd" id="4_75vfm"]
+[ext_resource type="Script" uid="uid://6txeii107j6d" path="res://scripts/components/interactor.gd" id="5_0owmy"]
+[ext_resource type="Script" uid="uid://c4782jsbkt3us" path="res://scripts/weapons/weapon_holder.gd" id="6_5gtgg"]
+[ext_resource type="Script" uid="uid://5fu0dix0r2va" path="res://scripts/weapons/weapon_data.gd" id="7_h17s1"]
+[ext_resource type="Resource" path="res://resources/weapons/pistol.tres" id="8_je7p5"]
+[ext_resource type="Resource" path="res://resources/weapons/rifle.tres" id="9_fm80t"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_lvxji"]
+radius = 0.35
+height = 1.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_p47bc"]
+albedo_color = Color(0.22745098, 0.3529412, 0.47058824, 1)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_75vfm"]
+radius = 0.35
+height = 1.8
+radial_segments = 16
+rings = 6
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0owmy"]
+albedo_color = Color(0.9098039, 0.6392157, 0.23921569, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_qek5x"]
+size = Vector3(0.2, 0.2, 0.3)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_qek5x"]
+radius = 1.3
+
+[node name="Player" type="CharacterBody3D" unique_id=505976826 node_paths=PackedStringArray("camera_rig", "visual")]
+collision_layer = 2
+collision_mask = 5
+script = ExtResource("1_dovo2")
+camera_rig = NodePath("CameraRig")
+visual = NodePath("Visual")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=910633807]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_lvxji")
+
+[node name="Visual" type="Node3D" parent="." unique_id=1374534955]
+
+[node name="Body" type="MeshInstance3D" parent="Visual" unique_id=433219479]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+material_override = SubResource("StandardMaterial3D_p47bc")
+mesh = SubResource("CapsuleMesh_75vfm")
+
+[node name="Nose" type="MeshInstance3D" parent="Visual" unique_id=664872837]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, -0.38)
+material_override = SubResource("StandardMaterial3D_0owmy")
+mesh = SubResource("BoxMesh_qek5x")
+
+[node name="CameraRig" type="Node3D" parent="." unique_id=540694177]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+script = ExtResource("2_gmlin")
+
+[node name="SpringArm3D" type="SpringArm3D" parent="CameraRig" unique_id=148307603]
+spring_length = 3.5
+margin = 0.2
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig/SpringArm3D" unique_id=1070998322]
+current = true
+
+[node name="HealthComponent" type="Node" parent="." unique_id=140231194]
+script = ExtResource("3_p47bc")
+
+[node name="Inventory" type="Node" parent="." unique_id=1263402284]
+script = ExtResource("4_75vfm")
+
+[node name="Interactor" type="Area3D" parent="." unique_id=883258389]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+script = ExtResource("5_0owmy")
+
+[node name="Reach" type="CollisionShape3D" parent="Interactor" unique_id=724441299]
+shape = SubResource("SphereShape3D_qek5x")
+
+[node name="WeaponHolder" type="Node" parent="." unique_id=590058274]
+script = ExtResource("6_5gtgg")
+weapons = Array[ExtResource("7_h17s1")]([ExtResource("8_je7p5"), ExtResource("9_fm80t")])

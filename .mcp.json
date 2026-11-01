@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "godot": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@shin2344234/godot-mcp",
+        "--project",
+        "C:\\Development\\BLACKLINE\\Game\\blackline"
+      ],
+      "env": {
+        "GODOT_PATH": "C:\\Development\\BLACKLINE\\Tools\\Godot\\Godot.exe"
+      }
+    }
+  }
+}

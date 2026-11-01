@@ -1,0 +1,55 @@
+[gd_scene format=3 uid="uid://d0quw4jpfjht5"]
+
+[ext_resource type="Script" uid="uid://ds8wvml7tuea7" path="res://scripts/enemies/enemy.gd" id="1_8e3ao"]
+[ext_resource type="Script" uid="uid://yodxh30270yy" path="res://scripts/components/health_component.gd" id="2_38ino"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_fcftc"]
+radius = 0.35
+height = 1.8
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_lu5c6"]
+radius = 0.35
+height = 1.8
+radial_segments = 16
+rings = 6
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_nb6gf"]
+albedo_color = Color(1, 0.8235294, 0.22745098, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_jt03m"]
+size = Vector3(0.24, 0.1, 0.2)
+
+[node name="Enemy" type="CharacterBody3D" unique_id=1770400841]
+collision_layer = 4
+collision_mask = 3
+script = ExtResource("1_8e3ao")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=681242240]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_fcftc")
+
+[node name="Visual" type="Node3D" parent="." unique_id=1466641432]
+
+[node name="Body" type="MeshInstance3D" parent="Visual" unique_id=1091237709]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+mesh = SubResource("CapsuleMesh_lu5c6")
+
+[node name="Eyes" type="MeshInstance3D" parent="Visual" unique_id=1216277516]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.55, -0.3)
+material_override = SubResource("StandardMaterial3D_nb6gf")
+mesh = SubResource("BoxMesh_jt03m")
+
+[node name="HealthComponent" type="Node" parent="." unique_id=1477011761]
+script = ExtResource("2_38ino")
+max_health = 60.0
+
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=178246941]
+path_desired_distance = 0.5
+height = 1.8
+radius = 0.4
+
+[node name="StateLabel" type="Label3D" parent="." unique_id=1078489849]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0)
+pixel_size = 0.01
+billboard = 1
+font_size = 96

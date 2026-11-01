@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://boovoi7dbmy86"]
+
+[ext_resource type="Script" uid="uid://d0wvw7tkt4l5g" path="res://scripts/props/pickup.gd" id="1_hlehv"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_0fmgj"]
+radius = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_r1no4"]
+size = Vector3(0.45, 0.45, 0.45)
+
+[node name="Pickup" type="Area3D" unique_id=735000163]
+script = ExtResource("1_hlehv")
+
+[node name="Reach" type="CollisionShape3D" parent="." unique_id=59060561]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+shape = SubResource("SphereShape3D_0fmgj")
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=946994722]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+mesh = SubResource("BoxMesh_r1no4")

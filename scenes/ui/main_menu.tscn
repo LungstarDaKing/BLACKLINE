@@ -1,0 +1,63 @@
+[gd_scene format=3 uid="uid://pr8rpk2b5mxq"]
+
+[ext_resource type="Script" uid="uid://cbwx35d8na814" path="res://scripts/ui/main_menu.gd" id="1_sl1te"]
+
+[node name="MainMenu" type="Control" unique_id=1486920541]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_sl1te")
+
+[node name="Background" type="ColorRect" parent="." unique_id=933113362]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.043137256, 0.050980393, 0.0627451, 1)
+
+[node name="Center" type="CenterContainer" parent="." unique_id=1609730807]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Center" unique_id=1632422761]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="Center/VBox" unique_id=654097222]
+layout_mode = 2
+theme_override_font_sizes/font_size = 72
+text = "BLACKLINE"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Center/VBox" unique_id=2116238817]
+layout_mode = 2
+text = "Milestone 2 - Gameplay build"
+horizontal_alignment = 1
+
+[node name="StartButton" type="Button" parent="Center/VBox" unique_id=1060936538]
+custom_minimum_size = Vector2(280, 48)
+layout_mode = 2
+text = "Start Mission"
+
+[node name="ArenaButton" type="Button" parent="Center/VBox" unique_id=1253467237]
+custom_minimum_size = Vector2(280, 48)
+layout_mode = 2
+text = "Movement Test Arena"
+
+[node name="QuitButton" type="Button" parent="Center/VBox" unique_id=1667966412]
+custom_minimum_size = Vector2(280, 48)
+layout_mode = 2
+text = "Quit"
+
+[node name="Controls" type="Label" parent="Center/VBox" unique_id=1937718958]
+modulate = Color(0.6039216, 0.6392157, 0.6901961, 1)
+layout_mode = 2
+text = "WASD move   Shift sprint   C crouch   Space jump   LMB fire   RMB aim   R reload   E interact   Esc pause"
+horizontal_alignment = 1

@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://cdcuw0uq8ap37"]
+
+[ext_resource type="Script" uid="uid://w7ppmm3hfsfm" path="res://scripts/props/block.gd" id="1_f25kf"]
+
+[node name="Block" type="StaticBody3D" unique_id=215851015]
+script = ExtResource("1_f25kf")
+
+[node name="Shape" type="CollisionShape3D" parent="." unique_id=946547460]
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=2117465678]

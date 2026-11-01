@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://cxeys4ogmi2dj"]
+
+[ext_resource type="Script" uid="uid://du8o72walpmcq" path="res://scripts/missions/zone_trigger.gd" id="1_uqv8a"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5l17e"]
+size = Vector3(4, 3, 4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ohqou"]
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.4, 0.21960784)
+
+[sub_resource type="BoxMesh" id="BoxMesh_22oew"]
+size = Vector3(4, 3, 4)
+
+[node name="ExtractionZone" type="Area3D" unique_id=2059340651]
+script = ExtResource("1_uqv8a")
+
+[node name="Shape" type="CollisionShape3D" parent="." unique_id=1678900711]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+shape = SubResource("BoxShape3D_5l17e")
+
+[node name="Marker" type="MeshInstance3D" parent="." unique_id=1297628110]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+material_override = SubResource("StandardMaterial3D_ohqou")
+mesh = SubResource("BoxMesh_22oew")

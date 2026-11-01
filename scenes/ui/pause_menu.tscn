@@ -1,0 +1,56 @@
+[gd_scene format=3 uid="uid://ci5dxjdrd7888"]
+
+[ext_resource type="Script" uid="uid://b5kx7cnpamvtl" path="res://scripts/ui/pause_menu.gd" id="1_6tw0m"]
+
+[node name="PauseMenu" type="CanvasLayer" unique_id=698992647]
+process_mode = 3
+layer = 10
+script = ExtResource("1_6tw0m")
+
+[node name="Panel" type="Control" parent="." unique_id=2108870993]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="Panel" unique_id=966300465]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.7019608)
+
+[node name="Center" type="CenterContainer" parent="Panel" unique_id=947798127]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Panel/Center" unique_id=1267303971]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="Panel/Center/VBox" unique_id=1993720852]
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+text = "PAUSED"
+horizontal_alignment = 1
+
+[node name="ResumeButton" type="Button" parent="Panel/Center/VBox" unique_id=741245761]
+custom_minimum_size = Vector2(260, 44)
+layout_mode = 2
+text = "Resume"
+
+[node name="MainMenuButton" type="Button" parent="Panel/Center/VBox" unique_id=420929668]
+custom_minimum_size = Vector2(260, 44)
+layout_mode = 2
+text = "Main Menu"
+
+[node name="QuitButton" type="Button" parent="Panel/Center/VBox" unique_id=1103780326]
+custom_minimum_size = Vector2(260, 44)
+layout_mode = 2
+text = "Quit to Desktop"

@@ -1,0 +1,47 @@
+[gd_scene format=3 uid="uid://b7pu4l1ge641f"]
+
+[ext_resource type="Script" uid="uid://btiq28bf43mme" path="res://scripts/props/data_terminal.gd" id="1_unwkr"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_5tg8u"]
+radius = 1.0
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hniri"]
+size = Vector3(1.2, 1.2, 0.7)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0ilyt"]
+albedo_color = Color(0.16470589, 0.18431373, 0.22745098, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_5ct1i"]
+size = Vector3(1.2, 1.2, 0.7)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_q1s2b"]
+albedo_color = Color(0.2, 1, 0.53333336, 1)
+emission_enabled = true
+emission = Color(0.2, 1, 0.53333336, 1)
+emission_energy_multiplier = 0.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_7g7x2"]
+size = Vector3(0.9, 0.55, 0.04)
+
+[node name="DataTerminal" type="Area3D" unique_id=1096265774]
+script = ExtResource("1_unwkr")
+prompt_text = "Download Data"
+
+[node name="Reach" type="CollisionShape3D" parent="." unique_id=1253804883]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+shape = SubResource("SphereShape3D_5tg8u")
+
+[node name="Body" type="StaticBody3D" parent="." unique_id=2118713581]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[node name="Shape" type="CollisionShape3D" parent="Body" unique_id=1997503835]
+shape = SubResource("BoxShape3D_hniri")
+
+[node name="Mesh" type="MeshInstance3D" parent="Body" unique_id=634671158]
+material_override = SubResource("StandardMaterial3D_0ilyt")
+mesh = SubResource("BoxMesh_5ct1i")
+
+[node name="Screen" type="MeshInstance3D" parent="Body" unique_id=43429139]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0.36)
+material_override = SubResource("StandardMaterial3D_q1s2b")
+mesh = SubResource("BoxMesh_7g7x2")
