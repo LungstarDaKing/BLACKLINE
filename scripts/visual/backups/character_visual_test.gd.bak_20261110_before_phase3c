@@ -1,0 +1,404 @@
+extends Node3D
+## Isolated visual test. Uses the real Player (controls, camera, collision) and
+## attaches a CharacterVisual to it at runtime, so nothing in player.tscn or
+## Mission 01 is modified.
+##
+## It loads Jack Carter from jack_model_path, prints diagnostics (clip mapping,
+## root motion, loop seams), attaches a placeholder weapon to the WeaponR bone,
+## and can spawn extra Jack clones for a performance test.
+## Keys (test scene only): F6 = 5 clones, F7 = 10 clones, F8 = clear clones.
+
+@export var use_jack: bool = true
+@export var jack_model_path: String = "res://assets/_incoming/Jack_Carter.fbx"
+## 180 because the facing test showed Jack_Carter.fbx faces +Z (the player's
+## Visual node treats -Z as forward). Set 0 for a model that already faces -Z.
+@export var jack_yaw_offset_degrees: float = 180.0
+@export var attach_placeholder_weapon: bool = true
+@export var use_synthetic_animations_if_no_model: bool = true
+@export var show_weapon_axes: bool = false
+## Grip transforms relative to the WeaponR bone (tuned visually).
+@export var pistol_grip_position: Vector3 = Vector3.ZERO
+@export var pistol_grip_rotation_degrees: Vector3 = Vector3(-35.0, 0.0, 0.0)
+@export var rifle_grip_position: Vector3 = Vector3.ZERO
+@export var rifle_grip_rotation_degrees: Vector3 = Vector3(-35.0, 0.0, 0.0)
+@export_group("Left hand IK (rifle)")
+@export var use_left_hand_ik: bool = true
+## Where the left hand grips the rifle, in the rifle pivot's space.
+@export var rifle_left_hand_target_position: Vector3 = Vector3(0.0, -0.03, 0.4)
+## Elbow hint in the Visual node's space (x right, y up, -z forward).
+@export var left_elbow_pole_position: Vector3 = Vector3(-0.5, 0.9, 0.15)
+@export var left_hand_ik_fade_speed: float = 8.0
+## Left-hand rotation on the handguard: offset on top of the rifle's orientation
+## (degrees) and how strongly the hand is turned to it (0 = off, 1 = full).
+@export var left_hand_rotation_offset_degrees: Vector3 = Vector3(-90.0, 0.0, 180.0)
+@export var left_hand_align_weight: float = 1.0
+@export var log_events: bool = true
+
+const SYNTHETIC_NAMES: PackedStringArray = [
+	"Idle", "Walk", "Run", "Sprint", "Crouch Idle", "Crouch Walk", "Jump", "Fall",
+]
+const EXPECTED_SYNTHETIC: Dictionary = {
+	"idle": "Idle", "walk": "Walk", "run": "Run", "sprint": "Sprint",
+	"crouch_idle": "Crouch Idle", "crouch_walk": "Crouch Walk",
+	"jump": "Jump", "fall": "Fall",
+}
+const EXPECTED_JACK: Dictionary = {
+	"idle": "Idle", "walk": "Walk", "run": "Run", "sprint": "Run",
+	"crouch_idle": "Crouch aim idle", "crouch_walk": "Crouch aim idle",
+	"jump": "Jump", "fall": "Fall",
+}
+const CLONE_CLIPS: PackedStringArray = ["Walk", "Run", "Idle", "Rifle aim idle", "Walk"]
+
+@onready var _player: PlayerController = $Player
+@onready var _info: Label = $Overlay/Info
+
+var _visual: CharacterVisual
+var _synthetic: bool = false
+var _clones: Array[Node3D] = []
+var _weapon_attachment: BoneAttachment3D
+var _pistol_pivot: Node3D
+var _rifle_pivot: Node3D
+var _holder: WeaponHolder
+var _ik: TwoBoneIK3D
+var _ik_target: Node3D
+var _ik_pole: Node3D
+var _hand_align: HandAlignModifier
+
+
+func _ready() -> void:
+	_run_synthetic_self_test()
+	_visual = CharacterVisual.new()
+	_visual.name = "CharacterVisual"
+	_visual.body = _player
+	if use_jack and ResourceLoader.exists(jack_model_path):
+		_visual.model_path = jack_model_path
+		_visual.model_yaw_offset_degrees = jack_yaw_offset_degrees
+	_visual.log_events = log_events
+	_visual.animation_changed.connect(_on_animation_changed)
+	_player.visual.add_child(_visual)
+	if _visual.model != null:
+		for placeholder in ["Body", "Nose"]:
+			var node := _player.visual.get_node_or_null(placeholder) as Node3D
+			if node:
+				node.visible = false
+		_report_jack_mapping()
+		_report_root_motion()
+		_report_loop_seams()
+		if attach_placeholder_weapon:
+			_attach_weapon()
+	elif use_synthetic_animations_if_no_model:
+		_install_synthetic_animations()
+
+
+func _process(delta: float) -> void:
+	_update_left_hand_ik(delta)
+	var speed := Vector2(_player.velocity.x, _player.velocity.z).length()
+	var model_text := "none (placeholder capsule)"
+	if _visual.model != null:
+		model_text = String(_visual.model.name)
+	elif _synthetic:
+		model_text += ", synthetic animation names"
+	_info.text = "Model: %s\nAnimation: %s  (role: %s)  Upper: %s\nWeapon: %s   Aiming: %s\nSpeed: %.1f m/s   On floor: %s   Crouching: %s\nFPS: %d   Clones: %d" % [
+		model_text, _visual.current_animation, _visual.current_role, _visual.upper_animation,
+		_visual.weapon_key, _player.is_aiming,
+		speed, _player.is_on_floor(), _player.is_crouching,
+		Engine.get_frames_per_second(), _clones.size(),
+	]
+
+
+func _on_animation_changed(role: StringName, animation: StringName) -> void:
+	if log_events:
+		print("EVENT anim role=%s clip=%s t=%.3f" % [role, animation, Time.get_ticks_msec() / 1000.0])
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo:
+		return
+	match key.keycode:
+		KEY_F6:
+			spawn_clones(5)
+		KEY_F7:
+			spawn_clones(10)
+		KEY_F8:
+			clear_clones()
+
+
+## Spawns extra Jack instances in a grid in front of the player (performance test).
+func spawn_clones(count: int) -> void:
+	clear_clones()
+	var scene := load(jack_model_path) as PackedScene
+	if scene == null:
+		return
+	var yaw := _player.camera_rig.get_yaw() if _player.camera_rig else 0.0
+	var forward := Vector3.FORWARD.rotated(Vector3.UP, yaw)
+	var right := forward.cross(Vector3.UP)
+	var origin := _player.global_position + forward * 6.0
+	for index in count:
+		var clone := scene.instantiate() as Node3D
+		add_child(clone)
+		var column := index % 5
+		var row := floori(index / 5.0)
+		clone.global_position = origin + right * (float(column) - 2.0) * 1.6 + forward * float(row) * 2.0
+		clone.global_position.y = 0.0
+		# The model faces +Z, so no extra turn faces it toward the camera behind the player.
+		clone.rotation.y = yaw
+		var players := clone.find_children("*", "AnimationPlayer", true, false)
+		if not players.is_empty():
+			var clone_player := players[0] as AnimationPlayer
+			var clip := CLONE_CLIPS[index % CLONE_CLIPS.size()]
+			if clone_player.has_animation(clip):
+				var animation := clone_player.get_animation(clip)
+				animation.loop_mode = Animation.LOOP_LINEAR
+				clone_player.play(clip)
+				clone_player.seek(randf() * animation.length)
+		_clones.append(clone)
+	print("CLONES spawned: ", _clones.size())
+
+
+## Runtime-only (not saved to project settings): turns vsync off so frame times
+## show real headroom instead of being capped at 16.67 ms.
+func set_vsync(enabled: bool) -> void:
+	DisplayServer.window_set_vsync_mode(
+		DisplayServer.VSYNC_ENABLED if enabled else DisplayServer.VSYNC_DISABLED
+	)
+	Engine.max_fps = 60 if enabled else 0
+	print("VSYNC enabled=", enabled)
+
+
+func clear_clones() -> void:
+	for clone in _clones:
+		clone.queue_free()
+	_clones.clear()
+
+
+func _run_synthetic_self_test() -> void:
+	var visual := CharacterVisual.new()
+	var animation_player := AnimationPlayer.new()
+	visual.add_child(animation_player)
+	var library := AnimationLibrary.new()
+	for animation_name in SYNTHETIC_NAMES:
+		var animation := Animation.new()
+		animation.length = 1.0
+		library.add_animation(animation_name, animation)
+	animation_player.add_animation_library("", library)
+	visual.animation_player = animation_player
+	_check_mapping("SYNTHETIC", visual.resolve_all(), EXPECTED_SYNTHETIC)
+	visual.free()
+
+
+func _report_jack_mapping() -> void:
+	var resolved := _visual.resolve_all()
+	_check_mapping("JACK", resolved, EXPECTED_JACK)
+	if _visual.animation_player != null:
+		print("JACK clips (", _visual.animation_player.get_animation_list().size(), "): ",
+				", ".join(_visual.animation_player.get_animation_list()))
+
+
+func _check_mapping(label: String, resolved: Dictionary, expected: Dictionary) -> void:
+	var failures: int = 0
+	for role: String in expected.keys():
+		var got: String = str(resolved.get(role, ""))
+		var want: String = str(expected[role])
+		var ok: bool = got == want
+		if not ok:
+			failures += 1
+		print("MAPPING %s role=%s -> '%s' (expected '%s') %s" % [label, role, got, want, "OK" if ok else "FAIL"])
+	print("MAPPING %s RESULT: %s" % [label, "PASS" if failures == 0 else "FAIL (%d)" % failures])
+
+
+func _find_track(animation: Animation, type: Animation.TrackType, suffix: String) -> int:
+	for track in animation.get_track_count():
+		if animation.track_get_type(track) == type \
+				and String(animation.track_get_path(track)).ends_with(suffix):
+			return track
+	return -1
+
+
+func _report_root_motion() -> void:
+	var animation_player := _visual.animation_player
+	if animation_player == null:
+		return
+	for clip: String in ["Idle", "Walk", "Run", "Jump", "Fall", "Crouch aim idle"]:
+		if not animation_player.has_animation(clip):
+			continue
+		var animation := animation_player.get_animation(clip)
+		var track := _find_track(animation, Animation.TYPE_POSITION_3D, ":Hips")
+		if track < 0:
+			print("ROOTMOTION %s: no Hips position track" % clip)
+			continue
+		var count := animation.track_get_key_count(track)
+		var first: Vector3 = animation.track_get_key_value(track, 0)
+		var last: Vector3 = animation.track_get_key_value(track, count - 1)
+		var min_v := first
+		var max_v := first
+		for key in count:
+			var value: Vector3 = animation.track_get_key_value(track, key)
+			min_v = Vector3(minf(min_v.x, value.x), minf(min_v.y, value.y), minf(min_v.z, value.z))
+			max_v = Vector3(maxf(max_v.x, value.x), maxf(max_v.y, value.y), maxf(max_v.z, value.z))
+		var drift := Vector2(last.x - first.x, last.z - first.z)
+		print("ROOTMOTION %s: keys=%d length=%.3fs drift_xz=%.3f m (x %.3f z %.3f) speed=%.2f m/s range_x=%.3f range_z=%.3f range_y=%.3f" % [
+			clip, count, animation.length, drift.length(), drift.x, drift.y,
+			drift.length() / maxf(animation.length, 0.001),
+			max_v.x - min_v.x, max_v.z - min_v.z, max_v.y - min_v.y,
+		])
+
+
+func _report_loop_seams() -> void:
+	var animation_player := _visual.animation_player
+	if animation_player == null:
+		return
+	for clip in animation_player.get_animation_list():
+		var animation := animation_player.get_animation(clip)
+		var worst: float = 0.0
+		var worst_bone: String = ""
+		var total: float = 0.0
+		var measured: int = 0
+		for track in animation.get_track_count():
+			if animation.track_get_type(track) != Animation.TYPE_ROTATION_3D:
+				continue
+			var count := animation.track_get_key_count(track)
+			if count < 2:
+				continue
+			var first: Quaternion = animation.track_get_key_value(track, 0)
+			var last: Quaternion = animation.track_get_key_value(track, count - 1)
+			var angle := rad_to_deg(first.angle_to(last))
+			total += angle
+			measured += 1
+			if angle > worst:
+				worst = angle
+				worst_bone = String(animation.track_get_path(track)).get_slice(":", 1)
+		print("LOOPSEAM %s: animated_bones=%d mean=%.1f deg worst=%.1f deg (%s)" % [
+			clip, measured, total / maxf(float(measured), 1.0), worst, worst_bone,
+		])
+
+
+func _attach_weapon() -> void:
+	var skeletons := _visual.model.find_children("*", "Skeleton3D", true, false)
+	if skeletons.is_empty():
+		print("WEAPON: no Skeleton3D found")
+		return
+	var skeleton := skeletons[0] as Skeleton3D
+	if skeleton.find_bone("WeaponR") < 0:
+		print("WEAPON: WeaponR bone not found")
+		return
+	_weapon_attachment = BoneAttachment3D.new()
+	_weapon_attachment.name = "WeaponRAttachment"
+	_weapon_attachment.bone_name = "WeaponR"
+	skeleton.add_child(_weapon_attachment)
+	var dark := Color(0.1, 0.1, 0.12)
+	var metal := Color(0.25, 0.25, 0.28)
+	# Pistol: grip origin at the hand, barrel along +Z.
+	_pistol_pivot = Node3D.new()
+	_pistol_pivot.name = "PistolPivot"
+	_pistol_pivot.position = pistol_grip_position
+	_pistol_pivot.rotation_degrees = pistol_grip_rotation_degrees
+	_weapon_attachment.add_child(_pistol_pivot)
+	_add_box(_pistol_pivot, Vector3(0.035, 0.05, 0.2), Vector3(0.0, 0.03, 0.08), metal)
+	_add_box(_pistol_pivot, Vector3(0.032, 0.11, 0.04), Vector3(0.0, -0.04, -0.01), dark)
+	# Rifle: grip at the hand, stock behind (-Z), barrel and foregrip ahead (+Z).
+	_rifle_pivot = Node3D.new()
+	_rifle_pivot.name = "RiflePivot"
+	_rifle_pivot.position = rifle_grip_position
+	_rifle_pivot.rotation_degrees = rifle_grip_rotation_degrees
+	_weapon_attachment.add_child(_rifle_pivot)
+	_add_box(_rifle_pivot, Vector3(0.05, 0.08, 0.5), Vector3(0.0, 0.04, 0.2), dark)
+	_add_box(_rifle_pivot, Vector3(0.025, 0.025, 0.3), Vector3(0.0, 0.05, 0.6), metal)
+	_add_box(_rifle_pivot, Vector3(0.045, 0.12, 0.25), Vector3(0.0, 0.0, -0.2), dark)
+	_add_box(_rifle_pivot, Vector3(0.04, 0.1, 0.04), Vector3(0.0, -0.08, 0.05), dark)
+	# Handguard where the left hand grips.
+	_add_box(_rifle_pivot, Vector3(0.05, 0.05, 0.22), rifle_left_hand_target_position + Vector3(0.0, 0.03, 0.0), metal)
+	if use_left_hand_ik:
+		_setup_left_hand_ik(skeleton)
+	if show_weapon_axes:
+		_add_box(_weapon_attachment, Vector3(0.03, 0.03, 0.03), Vector3(0.1, 0.0, 0.0), Color(1.0, 0.1, 0.1))
+		_add_box(_weapon_attachment, Vector3(0.03, 0.03, 0.03), Vector3(0.0, 0.1, 0.0), Color(0.1, 1.0, 0.1))
+		_add_box(_weapon_attachment, Vector3(0.03, 0.03, 0.03), Vector3(0.0, 0.0, 0.1), Color(0.2, 0.4, 1.0))
+	_holder = _player.get_node_or_null("WeaponHolder") as WeaponHolder
+	if _holder != null:
+		_holder.weapon_changed.connect(_on_weapon_changed)
+		_on_weapon_changed(_holder.get_current())
+	print("WEAPON: pivots attached to bone index ", skeleton.find_bone("WeaponR"))
+
+
+## Two-bone IK on the left arm: the hand reaches a target on the rifle, the
+## elbow is steered by a pole node. Influence is 0 unless the rifle is equipped.
+func _setup_left_hand_ik(skeleton: Skeleton3D) -> void:
+	for bone_name in ["LeftArm", "LeftForeArm", "LeftHand"]:
+		if skeleton.find_bone(bone_name) < 0:
+			print("IK: bone ", bone_name, " not found, left-hand IK skipped")
+			return
+	_ik_target = Node3D.new()
+	_ik_target.name = "LeftHandTarget"
+	_ik_target.position = rifle_left_hand_target_position
+	_rifle_pivot.add_child(_ik_target)
+	_ik_pole = Node3D.new()
+	_ik_pole.name = "LeftElbowPole"
+	_ik_pole.top_level = true
+	_player.visual.add_child(_ik_pole)
+	_ik = TwoBoneIK3D.new()
+	_ik.name = "LeftHandIK"
+	skeleton.add_child(_ik)
+	_ik.set_setting_count(1)
+	_ik.set_root_bone_name(0, "LeftArm")
+	_ik.set_middle_bone_name(0, "LeftForeArm")
+	_ik.set_end_bone_name(0, "LeftHand")
+	_ik.set_target_node(0, _ik.get_path_to(_ik_target))
+	_ik.set_pole_node(0, _ik.get_path_to(_ik_pole))
+	_ik.influence = 0.0
+	# Runs after the IK (children process in order): turns the hand to the grip.
+	_hand_align = HandAlignModifier.new()
+	_hand_align.name = "LeftHandAlign"
+	_hand_align.bone_name = "LeftHand"
+	_hand_align.target = _ik_target
+	_hand_align.offset_degrees = left_hand_rotation_offset_degrees
+	_hand_align.influence = 0.0
+	skeleton.add_child(_hand_align)
+	print("IK: left-hand TwoBoneIK3D + hand alignment created")
+
+
+func _update_left_hand_ik(delta: float) -> void:
+	if _ik == null:
+		return
+	_ik_pole.global_position = _player.visual.global_transform * left_elbow_pole_position
+	var goal := 1.0 if _visual.weapon_key == "rifle" else 0.0
+	_ik.influence = move_toward(_ik.influence, goal, left_hand_ik_fade_speed * delta)
+	if _hand_align != null:
+		_hand_align.influence = _ik.influence * left_hand_align_weight
+
+
+func _on_weapon_changed(data: WeaponData) -> void:
+	# The production WeaponModel box is hidden (its pose is rewritten every frame
+	# by WeaponHolder, so it cannot be reparented); we show our own visual instead.
+	var production := _player.visual.get_node_or_null("WeaponModel") as Node3D
+	if production != null:
+		production.visible = false
+	var name_lower := data.display_name.to_lower() if data != null else ""
+	_pistol_pivot.visible = name_lower.contains("pistol")
+	_rifle_pivot.visible = name_lower.contains("rifle")
+
+
+func _add_box(parent: Node3D, size: Vector3, offset: Vector3, color: Color) -> void:
+	var instance := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	instance.mesh = mesh
+	instance.position = offset
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	instance.material_override = material
+	parent.add_child(instance)
+
+
+func _install_synthetic_animations() -> void:
+	var animation_player := AnimationPlayer.new()
+	animation_player.name = "SyntheticAnimationPlayer"
+	var library := AnimationLibrary.new()
+	for animation_name in SYNTHETIC_NAMES:
+		var animation := Animation.new()
+		animation.length = 1.0
+		library.add_animation(animation_name, animation)
+	animation_player.add_animation_library("", library)
+	_visual.add_child(animation_player)
+	_visual.animation_player = animation_player
+	_synthetic = true

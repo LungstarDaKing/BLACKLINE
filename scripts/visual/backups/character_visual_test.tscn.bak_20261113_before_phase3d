@@ -1,0 +1,69 @@
+[gd_scene format=3 uid="uid://0xdgpgox4qu"]
+
+[ext_resource type="Script" uid="uid://da8hjnifcof7y" path="res://scripts/visual/character_visual_test.gd" id="1_m5fkl"]
+[ext_resource type="PackedScene" uid="uid://cveu1b1anwbwi" path="res://scenes/player/player.tscn" id="2_ihq23"]
+[ext_resource type="PackedScene" uid="uid://ci5dxjdrd7888" path="res://scenes/ui/pause_menu.tscn" id="3_7e53h"]
+
+[sub_resource type="Environment" id="Environment_v3dl6"]
+background_mode = 1
+background_color = Color(0.08627451, 0.101960786, 0.12941177, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.627451, 0.6666667, 0.72156864, 1)
+ambient_light_energy = 0.8
+tonemap_mode = 2
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_m5fkl"]
+size = Vector3(120, 0.4, 120)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_t62bk"]
+albedo_color = Color(0.22745098, 0.24705882, 0.28235295, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ihq23"]
+size = Vector3(120, 0.4, 120)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i6m0k"]
+albedo_color = Color(0.8156863, 0.2509804, 0.2509804, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_g6xwi"]
+size = Vector3(0.06, 1.8, 0.06)
+
+[node name="CharacterVisualTest" type="Node3D" unique_id=1114370803]
+script = ExtResource("1_m5fkl")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1570960738]
+environment = SubResource("Environment_v3dl6")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1131864745]
+transform = Transform3D(0.81915206, 0.43938506, -0.36868784, 0, 0.64278764, 0.76604444, 0.57357645, -0.62750685, 0.5265408, 0, 0, 0)
+light_energy = 1.1
+shadow_enabled = true
+directional_shadow_mode = 0
+directional_shadow_max_distance = 30.0
+
+[node name="Floor" type="StaticBody3D" parent="." unique_id=564062381]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 0)
+
+[node name="Shape" type="CollisionShape3D" parent="Floor" unique_id=157067796]
+shape = SubResource("BoxShape3D_m5fkl")
+
+[node name="Mesh" type="MeshInstance3D" parent="Floor" unique_id=1621107946]
+material_override = SubResource("StandardMaterial3D_t62bk")
+mesh = SubResource("BoxMesh_ihq23")
+
+[node name="HeightMarker_1_8m" type="MeshInstance3D" parent="." unique_id=620474881]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.9, 0)
+material_override = SubResource("StandardMaterial3D_i6m0k")
+mesh = SubResource("BoxMesh_g6xwi")
+
+[node name="Player" parent="." unique_id=505976826 instance=ExtResource("2_ihq23")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+
+[node name="PauseMenu" parent="." unique_id=698992647 instance=ExtResource("3_7e53h")]
+
+[node name="Overlay" type="CanvasLayer" parent="." unique_id=1549539263]
+
+[node name="Info" type="Label" parent="Overlay" unique_id=263199922]
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 16.0
+offset_bottom = 12.0

@@ -1,0 +1,271 @@
+class_name CharacterVisual
+extends Node3D
+## Drives a rigged humanoid model from a CharacterBody3D's movement.
+##
+## Add it as a child of the player's (or an enemy's) Visual node. It loads a
+## model, finds the AnimationPlayer inside it, and plays Idle / Walk / Run /
+## Sprint / Crouch / Jump / Fall clips.
+##
+## Clip matching is deterministic (it does not depend on list order):
+##   1. animation_overrides (role -> exact clip name)
+##   2. exact match of the normalised clip name against a role keyword
+##   3. partial match, skipping weapon/action clips, shortest name wins
+## If there is no model or no matching clip it simply does nothing.
+
+signal animation_changed(role: StringName, animation: StringName)
+
+@export var body: CharacterBody3D
+## Explicit model scene (.glb / .gltf / .fbx / .tscn). Leave empty to use the
+## first model file found in model_folder.
+@export_file("*.glb", "*.gltf", "*.fbx", "*.tscn") var model_path: String = ""
+@export_dir var model_folder: String = "res://assets/characters/player"
+@export var model_scale: float = 1.0
+## Extra yaw applied to the model only. Leave 0 unless a facing test shows the
+## model looks backwards (then 180).
+@export var model_yaw_offset_degrees: float = 0.0
+@export var blend_time: float = 0.2
+## role name -> exact clip name, e.g. {"walk": "Walk"}. Checked first.
+@export var animation_overrides: Dictionary = {}
+## Flattens horizontal Hips motion in memory (never saved). Only enable if a
+## root-motion test shows the clips drift.
+@export var lock_hips_xz: bool = false
+## Debug: when not empty, this clip is looped instead of the movement clips.
+@export var forced_animation: String = ""
+
+@export_group("Speed thresholds (m/s)")
+@export var walk_min_speed: float = 0.3
+## Above this the "run" clip is used instead of "walk".
+@export var run_min_speed: float = 2.6
+## Above this the "sprint" clip is used instead of "run".
+@export var sprint_min_speed: float = 6.0
+
+var model: Node3D
+var animation_player: AnimationPlayer
+var current_role: StringName = &""
+var current_animation: StringName = &""
+
+const MODEL_EXTENSIONS: PackedStringArray = ["glb", "gltf", "fbx", "tscn"]
+const ROLE_KEYWORDS: Dictionary = {
+	&"idle": ["idle"],
+	&"walk": ["walk"],
+	&"run": ["run", "jog"],
+	&"sprint": ["sprint", "run"],
+	&"crouch_idle": ["crouch idle", "crouchidle", "crouch"],
+	&"crouch_walk": ["crouch walk", "crouchwalk", "crouch"],
+	&"jump": ["jump"],
+	&"fall": ["fall"],
+}
+const FALLBACKS: Dictionary = {
+	&"sprint": [&"run", &"walk", &"idle"],
+	&"run": [&"walk", &"idle"],
+	&"walk": [&"idle"],
+	&"crouch_walk": [&"crouch_idle", &"walk", &"idle"],
+	&"crouch_idle": [&"idle"],
+	&"jump": [&"fall", &"idle"],
+	&"fall": [&"jump", &"idle"],
+}
+const LOOPING_ROLES: Array[StringName] = [
+	&"idle", &"walk", &"run", &"sprint", &"crouch_idle", &"crouch_walk", &"fall",
+]
+## Clips containing any of these words are never picked by partial matching.
+const EXCLUDED_WORDS: PackedStringArray = [
+	"rifle", "pistol", "punch", "drive", "ride", "throw", "strafe", "fire",
+	"grenade", "bicycle",
+]
+
+
+func _ready() -> void:
+	if body == null:
+		body = _find_body()
+	_load_model()
+	if animation_player == null:
+		var root: Node = model if model != null else self
+		var players := root.find_children("*", "AnimationPlayer", true, false)
+		if not players.is_empty():
+			animation_player = players[0] as AnimationPlayer
+	if animation_player != null and lock_hips_xz:
+		_lock_hips_horizontal()
+
+
+func _process(_delta: float) -> void:
+	if body == null or animation_player == null:
+		return
+	if forced_animation != "":
+		_play_forced()
+		return
+	var role := _pick_role()
+	if role != current_role:
+		_play_role(role)
+
+
+func describe() -> String:
+	var model_name: String = String(model.name) if model != null else "none"
+	return "model=%s anim=%s role=%s" % [model_name, current_animation, current_role]
+
+
+## role name -> clip name chosen for it (empty string when nothing matches).
+func resolve_all() -> Dictionary:
+	var result: Dictionary = {}
+	if animation_player == null:
+		return result
+	for role: StringName in ROLE_KEYWORDS.keys():
+		result[String(role)] = String(_resolve(role))
+	return result
+
+
+func _find_body() -> CharacterBody3D:
+	var node := get_parent()
+	while node != null:
+		if node is CharacterBody3D:
+			return node as CharacterBody3D
+		node = node.get_parent()
+	return null
+
+
+func _load_model() -> void:
+	var path := model_path if model_path != "" else _first_model_in_folder()
+	if path == "":
+		return
+	var scene := load(path) as PackedScene
+	if scene == null:
+		push_warning("CharacterVisual: could not load model '%s'." % path)
+		return
+	model = scene.instantiate() as Node3D
+	if model == null:
+		return
+	model.scale = Vector3.ONE * model_scale
+	model.rotation_degrees.y = model_yaw_offset_degrees
+	add_child(model)
+
+
+func _first_model_in_folder() -> String:
+	var dir := DirAccess.open(model_folder)
+	if dir == null:
+		return ""
+	var found: PackedStringArray = []
+	dir.list_dir_begin()
+	var file_name := dir.get_next()
+	while file_name != "":
+		if not dir.current_is_dir() and file_name.get_extension().to_lower() in MODEL_EXTENSIONS:
+			found.append(file_name)
+		file_name = dir.get_next()
+	dir.list_dir_end()
+	if found.is_empty():
+		return ""
+	found.sort()
+	return model_folder.path_join(found[0])
+
+
+func _lock_hips_horizontal() -> void:
+	for clip_name in animation_player.get_animation_list():
+		var animation := animation_player.get_animation(clip_name)
+		for track in animation.get_track_count():
+			if animation.track_get_type(track) != Animation.TYPE_POSITION_3D:
+				continue
+			if not String(animation.track_get_path(track)).ends_with(":Hips"):
+				continue
+			var first: Vector3 = animation.track_get_key_value(track, 0)
+			for key in animation.track_get_key_count(track):
+				var value: Vector3 = animation.track_get_key_value(track, key)
+				animation.track_set_key_value(track, key, Vector3(first.x, value.y, first.z))
+
+
+func _pick_role() -> StringName:
+	var crouching: bool = body.get(&"is_crouching") == true
+	var speed := Vector2(body.velocity.x, body.velocity.z).length()
+	if not body.is_on_floor():
+		return &"fall" if body.velocity.y < -1.0 else &"jump"
+	if crouching:
+		return &"crouch_walk" if speed > walk_min_speed else &"crouch_idle"
+	if speed > sprint_min_speed:
+		return &"sprint"
+	if speed > run_min_speed:
+		return &"run"
+	if speed > walk_min_speed:
+		return &"walk"
+	return &"idle"
+
+
+func _play_forced() -> void:
+	var clip := StringName(forced_animation)
+	if clip == current_animation and animation_player.is_playing():
+		return
+	if not animation_player.has_animation(clip):
+		return
+	var animation := animation_player.get_animation(clip)
+	if animation.loop_mode == Animation.LOOP_NONE:
+		animation.loop_mode = Animation.LOOP_LINEAR
+	animation_player.play(clip, blend_time)
+	current_role = &"forced"
+	current_animation = clip
+	animation_changed.emit(&"forced", clip)
+
+
+func _play_role(role: StringName) -> void:
+	current_role = role
+	var animation_name := _resolve(role)
+	if animation_name == &"" or animation_name == current_animation:
+		return
+	if role in LOOPING_ROLES:
+		var animation := animation_player.get_animation(animation_name)
+		if animation != null and animation.loop_mode == Animation.LOOP_NONE:
+			animation.loop_mode = Animation.LOOP_LINEAR
+	animation_player.play(animation_name, blend_time)
+	current_animation = animation_name
+	animation_changed.emit(role, animation_name)
+
+
+func _resolve(role: StringName) -> StringName:
+	var chain: Array = [role]
+	chain.append_array(FALLBACKS.get(role, []))
+	for candidate: StringName in chain:
+		var found := _find_animation(candidate)
+		if found != &"":
+			return found
+	return &""
+
+
+func _find_animation(role: StringName) -> StringName:
+	var override_name: String = str(animation_overrides.get(String(role), ""))
+	if override_name != "" and animation_player.has_animation(override_name):
+		return StringName(override_name)
+	var is_crouch_role := String(role).begins_with("crouch")
+	var keywords: Array = ROLE_KEYWORDS.get(role, [])
+	var names := animation_player.get_animation_list()
+	# Pass 1: exact match on the normalised name.
+	for keyword: String in keywords:
+		for clip in names:
+			var normal := _normalize(clip)
+			if not is_crouch_role and normal.contains("crouch"):
+				continue
+			if normal == keyword:
+				return StringName(clip)
+	# Pass 2: partial match; weapon/action clips skipped; shortest name wins.
+	for keyword: String in keywords:
+		var best: String = ""
+		for clip in names:
+			var normal := _normalize(clip)
+			if not is_crouch_role and normal.contains("crouch"):
+				continue
+			if _has_excluded_word(normal) or not normal.contains(keyword):
+				continue
+			if best == "" or clip.length() < best.length() \
+					or (clip.length() == best.length() and clip < best):
+				best = clip
+		if best != "":
+			return StringName(best)
+	return &""
+
+
+func _normalize(clip: String) -> String:
+	var text := clip.to_lower()
+	for character: String in ["_", "/", "(", ")", "-"]:
+		text = text.replace(character, " ")
+	return " ".join(text.split(" ", false))
+
+
+func _has_excluded_word(normal: String) -> bool:
+	for word in normal.split(" ", false):
+		if word in EXCLUDED_WORDS:
+			return true
+	return false

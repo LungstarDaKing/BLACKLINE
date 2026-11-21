@@ -1,0 +1,557 @@
+class_name CharacterVisual
+extends Node3D
+## Drives a rigged humanoid model from a CharacterBody3D's movement.
+##
+## Add it as a child of the player's (or an enemy's) Visual node. It loads a
+## model, finds the AnimationPlayer inside it, and plays Idle / Walk / Run /
+## Sprint / Crouch / Jump / Fall clips.
+##
+## Clip matching is deterministic (it does not depend on list order):
+##   1. animation_overrides (role -> exact clip name)
+##   2. exact match of the normalised clip name against a role keyword
+##   3. partial match, skipping weapon/action clips, shortest name wins
+## If there is no model or no matching clip it simply does nothing.
+##
+## Weapon layer (Phase 2): when the body has a WeaponHolder child, the adapter
+## reads its equipped weapon and the body's is_aiming flag, plays the aim clip
+## while aiming, and plays the fire clip when the holder's `fired` signal
+## arrives. While moving in an aim stance the legs and upper body can be
+## animated by two AnimationPlayers on filtered, in-memory copies of the clips.
+## It only reads game state; it never changes shooting behaviour.
+
+signal animation_changed(role: StringName, animation: StringName)
+
+@export var body: CharacterBody3D
+## Explicit model scene (.glb / .gltf / .fbx / .tscn). Leave empty to use the
+## first model file found in model_folder.
+@export_file("*.glb", "*.gltf", "*.fbx", "*.tscn") var model_path: String = ""
+@export_dir var model_folder: String = "res://assets/characters/player"
+@export var model_scale: float = 1.0
+## Extra yaw applied to the model only. Leave 0 unless a facing test shows the
+## model looks backwards (then 180).
+@export var model_yaw_offset_degrees: float = 0.0
+@export var blend_time: float = 0.2
+## role name -> exact clip name, e.g. {"walk": "Walk"}. Checked first.
+@export var animation_overrides: Dictionary = {}
+## Flattens horizontal Hips motion in memory (never saved). Only enable if a
+## root-motion test shows the clips drift.
+@export var lock_hips_xz: bool = false
+## Debug: when not empty, this clip is looped instead of the movement clips.
+@export var forced_animation: String = ""
+
+@export_group("Speed thresholds (m/s)")
+@export var walk_min_speed: float = 0.3
+## Above this the "run" clip is used instead of "walk".
+@export var run_min_speed: float = 2.6
+## Above this the "sprint" clip is used instead of "run".
+@export var sprint_min_speed: float = 6.0
+
+@export_group("Weapon layer")
+## weapon key (matched inside the weapon's display name, case-insensitive) ->
+## clip names. Keys: aim, fire, idle (armed, standing), aim_walk (full-body
+## aimed walk, optional), fire_loop (true for automatic weapons).
+@export var weapon_clips: Dictionary = {
+	"pistol": {
+		"aim": "Pistol aim",
+		"fire": "Pistol fire",
+		"idle": "Pistol idle (low ready)",
+		"aim_walk": "",
+		"fire_loop": false,
+	},
+	"rifle": {
+		"aim": "Rifle aim idle",
+		"fire": "Rifle fire (full auto)",
+		"idle": "",
+		"aim_walk": "Rifle walk (aiming)",
+		"fire_loop": true,
+	},
+}
+## The aim stance stays up this long after a shot (matches the controller's
+## own "keep facing the camera" window after combat).
+@export var ready_hold_time: float = 1.2
+## Blend upper-body aim/fire clips over lower-body movement clips.
+@export var layered_blending: bool = true
+@export var upper_blend_time: float = 0.15
+
+var model: Node3D
+var animation_player: AnimationPlayer
+var current_role: StringName = &""
+var current_animation: StringName = &""
+## Equipped weapon key ("pistol", "rifle", or "" when unarmed/unknown).
+var weapon_key: String = ""
+var upper_player: AnimationPlayer
+var upper_animation: StringName = &""
+
+var _holder: WeaponHolder
+var _skeleton: Skeleton3D
+var _lower_library: AnimationLibrary
+var _upper_library: AnimationLibrary
+var _ready_left: float = 0.0
+var _fire_left: float = 0.0
+var _restart_fire: bool = false
+var _resolve_cache: Dictionary = {}
+
+const MODEL_EXTENSIONS: PackedStringArray = ["glb", "gltf", "fbx", "tscn"]
+const ROLE_KEYWORDS: Dictionary = {
+	&"idle": ["idle"],
+	&"walk": ["walk"],
+	&"run": ["run", "jog"],
+	&"sprint": ["sprint", "run"],
+	&"crouch_idle": ["crouch idle", "crouchidle", "crouch"],
+	&"crouch_walk": ["crouch walk", "crouchwalk", "crouch"],
+	&"jump": ["jump"],
+	&"fall": ["fall"],
+}
+const FALLBACKS: Dictionary = {
+	&"sprint": [&"run", &"walk", &"idle"],
+	&"run": [&"walk", &"idle"],
+	&"walk": [&"idle"],
+	&"crouch_walk": [&"crouch_idle", &"walk", &"idle"],
+	&"crouch_idle": [&"idle"],
+	&"jump": [&"fall", &"idle"],
+	&"fall": [&"jump", &"idle"],
+}
+const LOOPING_ROLES: Array[StringName] = [
+	&"idle", &"walk", &"run", &"sprint", &"crouch_idle", &"crouch_walk", &"fall",
+]
+## Clips containing any of these words are never picked by partial matching.
+const EXCLUDED_WORDS: PackedStringArray = [
+	"rifle", "pistol", "punch", "drive", "ride", "throw", "strafe", "fire",
+	"grenade", "bicycle",
+]
+const LOWER_LIBRARY_NAME: String = "lowerbody"
+
+
+func _ready() -> void:
+	if body == null:
+		body = _find_body()
+	_load_model()
+	if animation_player == null:
+		var root: Node = model if model != null else self
+		var players := root.find_children("*", "AnimationPlayer", true, false)
+		if not players.is_empty():
+			animation_player = players[0] as AnimationPlayer
+	if animation_player != null and lock_hips_xz:
+		_lock_hips_horizontal()
+	_setup_weapon_layer()
+
+
+func _process(delta: float) -> void:
+	if body == null or animation_player == null:
+		return
+	if forced_animation != "":
+		_set_upper(&"", false)
+		_play_forced()
+		return
+	_ready_left = maxf(_ready_left - delta, 0.0)
+	_fire_left = maxf(_fire_left - delta, 0.0)
+	if weapon_key != "":
+		_update_weapon_pose()
+		return
+	var role := _pick_role()
+	if role != current_role:
+		_play_role(role)
+
+
+func describe() -> String:
+	var model_name: String = String(model.name) if model != null else "none"
+	return "model=%s anim=%s role=%s" % [model_name, current_animation, current_role]
+
+
+## role name -> clip name chosen for it (empty string when nothing matches).
+func resolve_all() -> Dictionary:
+	var result: Dictionary = {}
+	if animation_player == null:
+		return result
+	for role: StringName in ROLE_KEYWORDS.keys():
+		result[String(role)] = String(_resolve(role))
+	return result
+
+
+func _find_body() -> CharacterBody3D:
+	var node := get_parent()
+	while node != null:
+		if node is CharacterBody3D:
+			return node as CharacterBody3D
+		node = node.get_parent()
+	return null
+
+
+func _load_model() -> void:
+	var path := model_path if model_path != "" else _first_model_in_folder()
+	if path == "":
+		return
+	var scene := load(path) as PackedScene
+	if scene == null:
+		push_warning("CharacterVisual: could not load model '%s'." % path)
+		return
+	model = scene.instantiate() as Node3D
+	if model == null:
+		return
+	model.scale = Vector3.ONE * model_scale
+	model.rotation_degrees.y = model_yaw_offset_degrees
+	add_child(model)
+
+
+func _first_model_in_folder() -> String:
+	var dir := DirAccess.open(model_folder)
+	if dir == null:
+		return ""
+	var found: PackedStringArray = []
+	dir.list_dir_begin()
+	var file_name := dir.get_next()
+	while file_name != "":
+		if not dir.current_is_dir() and file_name.get_extension().to_lower() in MODEL_EXTENSIONS:
+			found.append(file_name)
+		file_name = dir.get_next()
+	dir.list_dir_end()
+	if found.is_empty():
+		return ""
+	found.sort()
+	return model_folder.path_join(found[0])
+
+
+func _lock_hips_horizontal() -> void:
+	for clip_name in animation_player.get_animation_list():
+		var animation := animation_player.get_animation(clip_name)
+		for track in animation.get_track_count():
+			if animation.track_get_type(track) != Animation.TYPE_POSITION_3D:
+				continue
+			if not String(animation.track_get_path(track)).ends_with(":Hips"):
+				continue
+			var first: Vector3 = animation.track_get_key_value(track, 0)
+			for key in animation.track_get_key_count(track):
+				var value: Vector3 = animation.track_get_key_value(track, key)
+				animation.track_set_key_value(track, key, Vector3(first.x, value.y, first.z))
+
+
+func _pick_role() -> StringName:
+	var crouching: bool = body.get(&"is_crouching") == true
+	var speed := Vector2(body.velocity.x, body.velocity.z).length()
+	if not body.is_on_floor():
+		return &"fall" if body.velocity.y < -1.0 else &"jump"
+	if crouching:
+		return &"crouch_walk" if speed > walk_min_speed else &"crouch_idle"
+	if speed > sprint_min_speed:
+		return &"sprint"
+	if speed > run_min_speed:
+		return &"run"
+	if speed > walk_min_speed:
+		return &"walk"
+	return &"idle"
+
+
+func _play_forced() -> void:
+	var clip := StringName(forced_animation)
+	if clip == current_animation and animation_player.is_playing():
+		return
+	if not animation_player.has_animation(clip):
+		return
+	var animation := animation_player.get_animation(clip)
+	if animation.loop_mode == Animation.LOOP_NONE:
+		animation.loop_mode = Animation.LOOP_LINEAR
+	animation_player.play(clip, blend_time)
+	current_role = &"forced"
+	current_animation = clip
+	animation_changed.emit(&"forced", clip)
+
+
+func _play_role(role: StringName) -> void:
+	current_role = role
+	var animation_name := _resolve(role)
+	if animation_name == &"" or animation_name == current_animation:
+		return
+	if role in LOOPING_ROLES:
+		var animation := animation_player.get_animation(animation_name)
+		if animation != null and animation.loop_mode == Animation.LOOP_NONE:
+			animation.loop_mode = Animation.LOOP_LINEAR
+	animation_player.play(animation_name, blend_time)
+	current_animation = animation_name
+	animation_changed.emit(role, animation_name)
+
+
+func _resolve(role: StringName) -> StringName:
+	if _resolve_cache.has(role):
+		return _resolve_cache[role]
+	var chain: Array = [role]
+	chain.append_array(FALLBACKS.get(role, []))
+	var result: StringName = &""
+	for candidate: StringName in chain:
+		var found := _find_animation(candidate)
+		if found != &"":
+			result = found
+			break
+	_resolve_cache[role] = result
+	return result
+
+
+func _find_animation(role: StringName) -> StringName:
+	var override_name: String = str(animation_overrides.get(String(role), ""))
+	if override_name != "" and animation_player.has_animation(override_name):
+		return StringName(override_name)
+	var is_crouch_role := String(role).begins_with("crouch")
+	var keywords: Array = ROLE_KEYWORDS.get(role, [])
+	var names := animation_player.get_animation_list()
+	# Pass 1: exact match on the normalised name.
+	for keyword: String in keywords:
+		for clip in names:
+			if clip.begins_with(LOWER_LIBRARY_NAME + "/"):
+				continue
+			var normal := _normalize(clip)
+			if not is_crouch_role and normal.contains("crouch"):
+				continue
+			if normal == keyword:
+				return StringName(clip)
+	# Pass 2: partial match; weapon/action clips skipped; shortest name wins.
+	for keyword: String in keywords:
+		var best: String = ""
+		for clip in names:
+			if clip.begins_with(LOWER_LIBRARY_NAME + "/"):
+				continue
+			var normal := _normalize(clip)
+			if not is_crouch_role and normal.contains("crouch"):
+				continue
+			if _has_excluded_word(normal) or not normal.contains(keyword):
+				continue
+			if best == "" or clip.length() < best.length() \
+					or (clip.length() == best.length() and clip < best):
+				best = clip
+		if best != "":
+			return StringName(best)
+	return &""
+
+
+func _normalize(clip: String) -> String:
+	var text := clip.to_lower()
+	for character: String in ["_", "/", "(", ")", "-"]:
+		text = text.replace(character, " ")
+	return " ".join(text.split(" ", false))
+
+
+func _has_excluded_word(normal: String) -> bool:
+	for word in normal.split(" ", false):
+		if word in EXCLUDED_WORDS:
+			return true
+	return false
+
+
+# --- Weapon layer -----------------------------------------------------------
+
+
+func _setup_weapon_layer() -> void:
+	if body == null or animation_player == null or model == null:
+		return
+	_holder = body.get_node_or_null("WeaponHolder") as WeaponHolder
+	if _holder == null:
+		return
+	var skeletons := model.find_children("*", "Skeleton3D", true, false)
+	if layered_blending and not skeletons.is_empty():
+		_skeleton = skeletons[0] as Skeleton3D
+		_lower_library = AnimationLibrary.new()
+		_upper_library = AnimationLibrary.new()
+		animation_player.add_animation_library(LOWER_LIBRARY_NAME, _lower_library)
+		upper_player = AnimationPlayer.new()
+		upper_player.name = "UpperBodyPlayer"
+		add_child(upper_player)
+		upper_player.root_node = upper_player.get_path_to(model)
+		upper_player.add_animation_library("", _upper_library)
+	_holder.fired.connect(_on_fired)
+	_holder.weapon_changed.connect(_on_weapon_changed)
+	_on_weapon_changed(_holder.get_current())
+
+
+func _on_weapon_changed(data: WeaponData) -> void:
+	weapon_key = _key_for(data)
+	_fire_left = 0.0
+	_ready_left = 0.0
+	current_animation = &""
+	upper_animation = &""
+
+
+func _on_fired() -> void:
+	if weapon_key == "":
+		return
+	var clips: Dictionary = weapon_clips.get(weapon_key, {})
+	_ready_left = ready_hold_time
+	_fire_left = maxf(_fire_left, _fire_hold(clips))
+	if not bool(clips.get("fire_loop", false)):
+		_restart_fire = true
+
+
+func _key_for(data: WeaponData) -> String:
+	if data == null:
+		return ""
+	var lowered := data.display_name.to_lower()
+	for key: String in weapon_clips.keys():
+		if lowered.contains(key):
+			return key
+	return ""
+
+
+func _clip_name(clips: Dictionary, key: String) -> StringName:
+	var clip_name: String = str(clips.get(key, ""))
+	if clip_name != "" and animation_player.has_animation(clip_name):
+		return StringName(clip_name)
+	return &""
+
+
+func _fire_hold(clips: Dictionary) -> float:
+	if bool(clips.get("fire_loop", false)):
+		return 0.25
+	var clip := _clip_name(clips, "fire")
+	if clip != &"":
+		return animation_player.get_animation(clip).length
+	return 0.3
+
+
+func _update_weapon_pose() -> void:
+	var clips: Dictionary = weapon_clips.get(weapon_key, {})
+	var aiming: bool = body.get(&"is_aiming") == true
+	var crouching: bool = body.get(&"is_crouching") == true
+	var stance := (aiming or _ready_left > 0.0) and body.is_on_floor() and not crouching
+	if not stance:
+		_set_upper(&"", false)
+		var role := _pick_role()
+		var idle_clip := _clip_name(clips, "idle")
+		if role == &"idle" and idle_clip != &"":
+			_play_main(idle_clip, &"idle", true)
+		else:
+			current_role = role
+			var clip := _resolve(role)
+			if clip != &"":
+				_play_main(clip, role, role in LOOPING_ROLES)
+		return
+
+	var speed := Vector2(body.velocity.x, body.velocity.z).length()
+	var firing := _fire_left > 0.0
+	var aim_clip := _clip_name(clips, "aim")
+	var fire_clip := _clip_name(clips, "fire")
+	var fire_loops := bool(clips.get("fire_loop", false))
+	var upper_clip := fire_clip if (firing and fire_clip != &"") else aim_clip
+	var upper_loops := fire_loops if upper_clip == fire_clip else true
+
+	if speed <= walk_min_speed:
+		_set_upper(&"", false)
+		_play_main(upper_clip, &"aim_fire" if firing else &"aim_idle", upper_loops)
+		return
+
+	var walk_clip := _clip_name(clips, "aim_walk")
+	if walk_clip == &"":
+		walk_clip = _resolve(&"walk")
+	if not firing and _clip_name(clips, "aim_walk") != &"":
+		# A full-body aimed walk exists and nothing is overlaid on it.
+		_set_upper(&"", false)
+		_play_main(walk_clip, &"aim_walk", true)
+		return
+	if upper_player != null and upper_clip != &"" and walk_clip != &"":
+		var lower := _layer_clip(walk_clip, false, true)
+		if lower != &"":
+			_play_main(lower, &"aim_layered", true)
+			_set_upper(upper_clip, upper_loops)
+			return
+	_set_upper(&"", false)
+	_play_main(walk_clip, &"aim_walk", true)
+
+
+## Plays a clip on the main (full-body or lower-body) player.
+func _play_main(clip: StringName, role: StringName, loop: bool) -> void:
+	if clip == &"":
+		return
+	var restart := _restart_fire and _is_fire_clip(clip)
+	current_role = role
+	if clip == current_animation and not restart:
+		return
+	var animation := animation_player.get_animation(clip)
+	if animation == null:
+		return
+	if loop and animation.loop_mode == Animation.LOOP_NONE:
+		animation.loop_mode = Animation.LOOP_LINEAR
+	animation_player.play(clip, 0.05 if restart else blend_time)
+	if restart:
+		animation_player.seek(0.0, true)
+		_restart_fire = false
+	current_animation = clip
+	animation_changed.emit(role, clip)
+
+
+## Plays (or stops, with an empty name) the upper-body overlay.
+func _set_upper(clip: StringName, loop: bool) -> void:
+	if upper_player == null:
+		return
+	if clip == &"":
+		if upper_animation != &"":
+			upper_player.stop()
+			upper_animation = &""
+		return
+	var layer := _layer_clip(clip, true, loop)
+	if layer == &"":
+		return
+	var restart := _restart_fire and _is_fire_clip(clip)
+	if layer == upper_animation and not restart:
+		return
+	upper_player.play(layer, 0.05 if restart else upper_blend_time)
+	if restart:
+		upper_player.seek(0.0, true)
+		_restart_fire = false
+	upper_animation = layer
+
+
+func _is_fire_clip(clip: StringName) -> bool:
+	var clips: Dictionary = weapon_clips.get(weapon_key, {})
+	var fire := _clip_name(clips, "fire")
+	return fire != &"" and String(clip).contains(String(fire))
+
+
+## Returns the name of an in-memory copy of `clip` that only animates the
+## upper body (upper = true) or only the hips and legs. Never saved to disk.
+func _layer_clip(clip: StringName, upper: bool, loop: bool) -> StringName:
+	if _skeleton == null:
+		return &""
+	var key := "%s__%s%s" % [
+		String(clip), "upper" if upper else "lower", "_loop" if loop else "_once"
+	]
+	var library := _upper_library if upper else _lower_library
+	if not library.has_animation(key):
+		var source := animation_player.get_animation(clip)
+		if source == null:
+			return &""
+		var copy := source.duplicate() as Animation
+		for index in range(copy.get_track_count() - 1, -1, -1):
+			if copy.track_get_type(index) == Animation.TYPE_BLEND_SHAPE:
+				copy.remove_track(index)
+				continue
+			var track_path := String(copy.track_get_path(index))
+			if not track_path.contains(":"):
+				continue
+			var bone := track_path.get_slice(":", 1)
+			if _is_lower_bone(bone) == upper:
+				copy.remove_track(index)
+		_complete_with_rest(copy, upper)
+		copy.loop_mode = Animation.LOOP_LINEAR if loop else Animation.LOOP_NONE
+		library.add_animation(key, copy)
+	if upper:
+		return StringName(key)
+	return StringName(LOWER_LIBRARY_NAME + "/" + key)
+
+
+## Adds a rest-pose rotation track for every bone of this layer that the clip
+## does not animate, so no bone keeps a stale pose when layers switch.
+func _complete_with_rest(copy: Animation, upper: bool) -> void:
+	var skeleton_path := model.get_path_to(_skeleton)
+	var present: Dictionary = {}
+	for index in copy.get_track_count():
+		if copy.track_get_type(index) == Animation.TYPE_ROTATION_3D:
+			present[String(copy.track_get_path(index)).get_slice(":", 1)] = true
+	for bone in _skeleton.get_bone_count():
+		var bone_name := _skeleton.get_bone_name(bone)
+		if _is_lower_bone(bone_name) == upper or present.has(bone_name):
+			continue
+		var track := copy.add_track(Animation.TYPE_ROTATION_3D)
+		copy.track_set_path(track, NodePath("%s:%s" % [skeleton_path, bone_name]))
+		var rest := _skeleton.get_bone_rest(bone).basis.get_rotation_quaternion()
+		copy.rotation_track_insert_key(track, 0.0, rest)
+
+
+func _is_lower_bone(bone: String) -> bool:
+	return bone == "Hips" or bone.ends_with("UpLeg") or bone.ends_with("Leg") \
+			or bone.contains("Foot") or bone.contains("Toe")

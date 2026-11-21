@@ -1,0 +1,42 @@
+class_name AimPitchModifier
+extends SkeletonModifier3D
+## Adds an up/down aiming pitch to a few spine bones after the animation has
+## been applied. Positive pitch looks up. Hips and legs are never touched, so
+## lower-body animation stays independent. Must be a direct child of the
+## Skeleton3D. Test-environment helper: it only changes the pose in memory.
+## (Added in Phase 3A.)
+
+## Pitch to add, in radians (positive = aim up).
+var pitch_radians: float = 0.0
+## The character's right-hand direction in world space.
+var right_axis_world: Vector3 = Vector3.RIGHT
+## bone name -> share of the pitch (shares should sum to about 1). Spreading
+## the rotation over several bones avoids twisting a single spine joint.
+## Phase 3B: the lower spine takes little (it swings the whole torso back), the
+## upper spine takes more, the head follows, and the upper arms add the rest so
+## the weapon still reaches the full angle with less body lean. Order matters:
+## parents first. Spine chain ends at 0.55, head chain 0.8, arm chains 1.0.
+var bone_weights: Dictionary = {
+	"Spine": 0.08, "Spine1": 0.2, "Spine2": 0.27,
+	"Neck": 0.1, "Head": 0.15,
+	"RightArm": 0.45, "LeftArm": 0.45,
+}
+
+
+func _process_modification() -> void:
+	var skeleton := get_skeleton()
+	if skeleton == null or absf(pitch_radians) < 0.0001:
+		return
+	var axis_in_skeleton := (skeleton.global_basis.orthonormalized().inverse() * right_axis_world).normalized()
+	for bone_name: String in bone_weights.keys():
+		var index := skeleton.find_bone(bone_name)
+		if index < 0:
+			continue
+		var angle := pitch_radians * float(bone_weights[bone_name])
+		var parent := skeleton.get_bone_parent(index)
+		var parent_basis := Basis()
+		if parent >= 0:
+			parent_basis = skeleton.get_bone_global_pose(parent).basis.orthonormalized()
+		var axis_local := (parent_basis.inverse() * axis_in_skeleton).normalized()
+		var rotation := skeleton.get_bone_pose_rotation(index)
+		skeleton.set_bone_pose_rotation(index, Quaternion(axis_local, angle) * rotation)

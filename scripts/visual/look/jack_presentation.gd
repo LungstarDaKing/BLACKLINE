@@ -1,0 +1,323 @@
+class_name JackPresentation
+extends Node
+## Character showcase for the isolated Jack test scene (Phase 3D).
+##
+## Adds, at runtime only: upgraded materials (JackLook), finger curl, three
+## lighting presets and showcase cameras. Nothing in the project's rendering
+## settings is changed: it swaps the test scene's own WorldEnvironment and
+## lights while the scene runs.
+##
+## Keys: F2 lighting preset, F3 original / upgraded materials, F4 showcase
+## camera (front, side, rear, 3/4, face, torso, hands, game camera),
+## H hides or shows the on-screen text.
+
+enum Lighting { DAYLIGHT, INDOOR, LOWLIGHT }
+
+const LIGHT_NAMES: PackedStringArray = ["Daylight", "Indoor", "Low light"]
+## name, camera yaw around the character (0 = in front), distance, field of
+## view, bone to look at, extra height
+const VIEWS: Array = [
+	["Front", 0.0, 3.6, 40.0, "Hips", 0.1],
+	["Side", 90.0, 3.6, 40.0, "Hips", 0.1],
+	["Rear", 180.0, 3.6, 40.0, "Hips", 0.1],
+	["Three-quarter", 38.0, 3.4, 40.0, "Hips", 0.1],
+	["Face", 18.0, 0.8, 26.0, "Head", -0.03],
+	["Torso / clothing", 28.0, 1.5, 30.0, "Spine2", 0.0],
+	["Hands / weapon", 35.0, 1.1, 30.0, "RightHand", 0.0],
+	["Shoes", 40.0, 1.3, 30.0, "LeftFoot", 0.0],
+]
+
+var visual: CharacterVisual
+var player: CharacterBody3D
+var info_label: Label
+var scene_root: Node3D
+
+var look: JackLook
+var finger_modifier: FingerCurlModifier
+var lighting: int = Lighting.DAYLIGHT
+var view_index: int = -1
+var overlay_visible: bool = true
+
+var _environment: Environment
+var _sky_material: ProceduralSkyMaterial
+var _key: DirectionalLight3D
+var _fill: DirectionalLight3D
+var _rim: DirectionalLight3D
+var _camera: Camera3D
+var _label: Label
+var _skeleton: Skeleton3D
+var _original_environment: Environment
+var _original_sun: Light3D
+var _look_target: Vector3 = Vector3.ZERO
+var _camera_ready: bool = false
+
+
+func setup(visual_node: CharacterVisual, body: CharacterBody3D, root: Node3D, info: Label) -> void:
+	visual = visual_node
+	player = body
+	scene_root = root
+	info_label = info
+	var skeletons := visual.model.find_children("*", "Skeleton3D", true, false)
+	if not skeletons.is_empty():
+		_skeleton = skeletons[0] as Skeleton3D
+	look = JackLook.new()
+	look.name = "JackLook"
+	add_child(look)
+	look.setup(visual.model)
+	look.apply()
+	if _skeleton != null:
+		finger_modifier = FingerCurlModifier.new()
+		finger_modifier.name = "FingerCurlModifier"
+		_skeleton.add_child(finger_modifier)
+	_build_lighting()
+	_build_camera()
+	_label = Label.new()
+	_label.name = "ShowcaseLabel"
+	_label.position = Vector2(16.0, 640.0)
+	var layer := info.get_parent()
+	layer.add_child(_label)
+	set_lighting(Lighting.DAYLIGHT)
+
+
+func _process(delta: float) -> void:
+	if visual == null or visual.model == null:
+		return
+	_update_fingers(delta)
+	_update_camera(delta)
+	_update_light_rig()
+	_label.text = "Look: %s   Lighting: %s   View: %s\nF2 lighting   F3 materials   F4 camera   H hide text" % [
+		"upgraded" if look.upgraded else "original (imported)", LIGHT_NAMES[lighting],
+		"game camera" if view_index < 0 else String(VIEWS[view_index][0]),
+	]
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo:
+		return
+	match key.keycode:
+		KEY_F2:
+			set_lighting((lighting + 1) % LIGHT_NAMES.size())
+		KEY_F3:
+			if look.upgraded:
+				look.restore()
+			else:
+				look.apply()
+		KEY_F4:
+			set_view(view_index + 1 if view_index + 1 < VIEWS.size() else -1)
+		KEY_H:
+			overlay_visible = not overlay_visible
+			info_label.visible = overlay_visible
+			_label.visible = overlay_visible
+
+
+func set_view(index: int) -> void:
+	view_index = index
+	if index < 0:
+		_camera.current = false
+		return
+	_camera_ready = false
+	_camera.current = true
+
+
+# --- fingers -----------------------------------------------------------------
+
+
+func _update_fingers(delta: float) -> void:
+	if finger_modifier == null:
+		return
+	var right_goal: float = 0.2
+	var left_goal: float = 0.2
+	var right_thumb: float = 0.15
+	var left_thumb: float = 0.15
+	match visual.weapon_key:
+		"pistol":
+			right_goal = 0.8
+			right_thumb = 0.6
+			left_goal = 0.55
+			left_thumb = 0.4
+		"rifle":
+			right_goal = 0.8
+			right_thumb = 0.6
+			left_goal = 0.75
+			left_thumb = 0.5
+	var step: float = delta * 6.0
+	finger_modifier.right_amount = move_toward(finger_modifier.right_amount, right_goal, step)
+	finger_modifier.left_amount = move_toward(finger_modifier.left_amount, left_goal, step)
+	finger_modifier.right_thumb = move_toward(finger_modifier.right_thumb, right_thumb, step)
+	finger_modifier.left_thumb = move_toward(finger_modifier.left_thumb, left_thumb, step)
+
+
+# --- camera ------------------------------------------------------------------
+
+
+func _build_camera() -> void:
+	_camera = Camera3D.new()
+	_camera.name = "ShowcaseCamera"
+	_camera.top_level = true
+	scene_root.add_child(_camera)
+
+
+func _bone_world(bone_name: String) -> Vector3:
+	if _skeleton == null:
+		return player.global_position + Vector3.UP
+	var index := _skeleton.find_bone(bone_name)
+	if index < 0:
+		return player.global_position + Vector3.UP
+	return _skeleton.global_transform * _skeleton.get_bone_global_pose(index).origin
+
+
+func _update_camera(delta: float) -> void:
+	if view_index < 0:
+		return
+	var view: Array = VIEWS[view_index]
+	var forward: Vector3 = -player.visual.global_basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
+	var target: Vector3 = _bone_world(String(view[4])) + Vector3.UP * float(view[5])
+	var offset: Vector3 = forward.rotated(Vector3.UP, deg_to_rad(float(view[1]))) * float(view[2])
+	var goal: Vector3 = target + offset
+	goal.y = maxf(goal.y, target.y + (0.1 if float(view[2]) < 1.0 else 0.35))
+	var blend: float = 1.0 if not _camera_ready else 1.0 - exp(-10.0 * delta)
+	_camera_ready = true
+	_look_target = _look_target.lerp(target, blend)
+	_camera.global_position = _camera.global_position.lerp(goal, blend)
+	_camera.fov = lerpf(_camera.fov, float(view[3]), blend)
+	_camera.look_at(_look_target, Vector3.UP)
+
+
+# --- lighting ----------------------------------------------------------------
+
+
+func _build_lighting() -> void:
+	_sky_material = ProceduralSkyMaterial.new()
+	var sky := Sky.new()
+	sky.sky_material = _sky_material
+	_environment = Environment.new()
+	_environment.background_mode = Environment.BG_SKY
+	_environment.sky = sky
+	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	_environment.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	_environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	# Soft distance fog so the edge of the 120 m test floor melts into the horizon.
+	_environment.fog_enabled = true
+	_environment.fog_density = 0.005
+	_environment.fog_sky_affect = 0.0
+	var world := scene_root.get_node_or_null("WorldEnvironment") as WorldEnvironment
+	if world != null:
+		_original_environment = world.environment
+		world.environment = _environment
+	_original_sun = scene_root.get_node_or_null("Sun") as Light3D
+	if _original_sun != null:
+		_original_sun.visible = false
+	_key = _make_light("KeyLight", true)
+	_fill = _make_light("FillLight", false)
+	_rim = _make_light("RimLight", false)
+	_dress_set()
+
+
+## Showcase stage: hides the red height marker and gives the 120 m floor a
+## neutral matte concrete look plus a huge plane under it so no floor edge or
+## void shows at the horizon. Runtime only; the scene file is not changed.
+func _dress_set() -> void:
+	var marker := scene_root.get_node_or_null("HeightMarker_1_8m") as Node3D
+	if marker != null:
+		marker.visible = false
+	var floor_material := StandardMaterial3D.new()
+	floor_material.albedo_color = Color(0.2, 0.205, 0.215)
+	floor_material.roughness = 0.92
+	floor_material.metallic_specular = 0.15
+	var floor_mesh := scene_root.get_node_or_null("Floor/Mesh") as MeshInstance3D
+	if floor_mesh != null:
+		floor_mesh.material_override = floor_material
+	var plane := MeshInstance3D.new()
+	plane.name = "ShowcaseGround"
+	var plane_mesh := PlaneMesh.new()
+	plane_mesh.size = Vector2(4000.0, 4000.0)
+	plane.mesh = plane_mesh
+	plane.material_override = floor_material
+	plane.position = Vector3(0.0, -0.03, 0.0)
+	plane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	scene_root.add_child(plane)
+
+
+func _make_light(light_name: String, shadows: bool) -> DirectionalLight3D:
+	var light := DirectionalLight3D.new()
+	light.name = light_name
+	light.shadow_enabled = shadows
+	if shadows:
+		light.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+		light.directional_shadow_max_distance = 12.0
+		light.shadow_normal_bias = 1.2
+	add_child(light)
+	return light
+
+
+func set_lighting(preset: int) -> void:
+	lighting = preset
+	match preset:
+		Lighting.DAYLIGHT:
+			_sky_material.sky_top_color = Color(0.32, 0.5, 0.78)
+			_sky_material.sky_horizon_color = Color(0.68, 0.74, 0.8)
+			_sky_material.ground_horizon_color = Color(0.55, 0.55, 0.55)
+			_sky_material.ground_bottom_color = Color(0.3, 0.3, 0.32)
+			_environment.ambient_light_energy = 0.5
+			_environment.tonemap_exposure = 0.75
+			_set_light(_key, Color(1.0, 0.95, 0.88), 1.0)
+			_set_light(_fill, Color(0.7, 0.8, 1.0), 0.18)
+			_set_light(_rim, Color(1.0, 0.96, 0.88), 0.5)
+		Lighting.INDOOR:
+			_sky_material.sky_top_color = Color(0.17, 0.15, 0.13)
+			_sky_material.sky_horizon_color = Color(0.32, 0.26, 0.2)
+			_sky_material.ground_horizon_color = Color(0.2, 0.16, 0.12)
+			_sky_material.ground_bottom_color = Color(0.07, 0.06, 0.05)
+			_environment.ambient_light_energy = 0.7
+			_environment.tonemap_exposure = 1.0
+			_set_light(_key, Color(1.0, 0.78, 0.55), 1.2)
+			_set_light(_fill, Color(1.0, 0.85, 0.7), 0.12)
+			_set_light(_rim, Color(0.85, 0.92, 1.0), 0.5)
+		Lighting.LOWLIGHT:
+			_sky_material.sky_top_color = Color(0.01, 0.015, 0.035)
+			_sky_material.sky_horizon_color = Color(0.03, 0.04, 0.075)
+			_sky_material.ground_horizon_color = Color(0.02, 0.02, 0.03)
+			_sky_material.ground_bottom_color = Color(0.005, 0.005, 0.01)
+			_environment.ambient_light_energy = 0.5
+			_environment.tonemap_exposure = 1.25
+			_set_light(_key, Color(0.5, 0.62, 1.0), 0.55)
+			_set_light(_fill, Color(0.3, 0.4, 0.8), 0.05)
+			_set_light(_rim, Color(1.0, 0.55, 0.25), 1.7)
+	_finish_preset()
+
+
+func _finish_preset() -> void:
+	_environment.fog_light_color = _sky_material.sky_horizon_color
+
+
+func _set_light(light: DirectionalLight3D, color: Color, energy: float) -> void:
+	light.light_color = color
+	light.light_energy = energy
+
+
+## Aims the three lights relative to whatever camera is rendering, like a
+## portrait setup: key up-left of the camera, fill from the right, rim from
+## behind the character.
+func _update_light_rig() -> void:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null or _key == null:
+		return
+	var toward_camera: Vector3 = camera.global_basis.z
+	toward_camera.y = 0.0
+	if toward_camera.length() < 0.01:
+		return
+	toward_camera = toward_camera.normalized()
+	var right: Vector3 = Vector3.UP.cross(toward_camera).normalized()
+	var up := Vector3.UP
+	_aim(_key, toward_camera * 0.8 - right * 0.9 + up * 1.0)
+	_aim(_fill, toward_camera * 0.6 + right * 1.0 + up * 0.2)
+	_aim(_rim, -toward_camera * 1.0 + right * 0.5 + up * 0.7)
+
+
+func _aim(light: DirectionalLight3D, position_from_subject: Vector3) -> void:
+	var direction: Vector3 = -position_from_subject.normalized()
+	var up_hint := Vector3.UP if absf(direction.dot(Vector3.UP)) < 0.99 else Vector3.FORWARD
+	light.global_transform = Transform3D(Basis.looking_at(direction, up_hint), light.global_position)

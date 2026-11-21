@@ -1,4 +1,31 @@
-# CLAUDE HANDOVER — BLACKLINE Mission 01 Pickup Fix
+# CLAUDE HANDOVER — BLACKLINE
+
+## CURRENT STATE: Phase 5A prep (2026-11-05, Claude Desktop)
+
+**Done and verified:** the isolated character visual test scene and animation adapter work (all 8 roles selected correctly with synthetic animations). Mission 01 and all gameplay scripts untouched. Validation 0/0.
+
+**Not done:** no realistic character exists yet. The project contains no `.fbx/.glb/.gltf` at all, and `assets/characters/*` are empty. The player is still the blue capsule.
+
+**Launch:** open `res://scenes/test/character_visual_test.tscn` in Godot, press F6 (Run Current Scene). WASD/Shift/C/Space move; Esc pauses. Top-left overlay shows model + current animation.
+
+**Files created:** `scripts/visual/character_visual.gd`, `scripts/visual/character_visual_test.gd`, `scenes/test/character_visual_test.tscn`. **Docs edited:** this file, `DEVLOG.md`.
+
+**Decisions:**
+- Recommended first source: Mixamo (Adobe FAQ: royalty-free incl. commercial games, Adobe ID needed, no standalone redistribution). Character look must be chosen by the user in Mixamo's library (behind login; not verified which one best fits "Kabelo"). The BLACKLINE hoodie emblem will be a custom texture added later.
+- Fallback (CC0, stylized): Quaternius Universal Base Characters + Universal Animation Library (quaternius.com).
+- The model attaches under `Player/Visual` via `CharacterVisual`; `player.tscn` is not modified until the test scene passes with a real model. Enemy.gd needs `$Visual/Body`; keep that node when replacing enemy visuals.
+
+**Exact next steps (user):**
+1. mixamo.com, sign in with an Adobe ID. Pick ONE adult male character. Download: Format FBX Binary (.fbx), Pose T-pose, WITH skin. Save as `kabelo.fbx`.
+2. With that character selected, download these animations (FBX Binary, 30 fps, WITHOUT skin, tick **In Place** for locomotion): Idle, Walking, Running, Sprint (or a fast run), Jump, Falling Idle, Crouch Idle, Crouched Walking.
+3. Copy all files into `C:\Development\BLACKLINE\Game\blackline\assets\characters\player\`. Expected size: well under 100 MB total.
+4. Tell Claude. Claude then configures import (BoneMap/humanoid retarget via MCP import tools; exact editor clicks will be given if a dialog is required), builds the AnimationLibrary and re-runs the test scene.
+
+**Known risks:** Mixamo clip names are generic (rename files Idle.fbx, Run.fbx etc. so the adapter can match); FBX scale/orientation may need a model_scale tweak (use the 1.8 m red marker); retargeting from non-T-pose sources can twist hands; real-model path is untested.
+
+---
+
+# Previous session: Mission 01 Pickup Fix
 
 **Date:** 2026-11-01  
 **Session:** Forensic investigation + approved minimal fix for vertical alignment of pickups
